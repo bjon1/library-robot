@@ -6,7 +6,7 @@ def stop_movement():
 
 def check_distance(distance):
     if(distance < 1):
-        #Stop all movement
+
         return False
     return True
 
@@ -57,9 +57,9 @@ class USensor:
             time.sleep(0.5)
 
 
+GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
 usensor1 = USensor(trig=16, echo=18)
 usensor2 = USensor(trig=19, echo=21)
-GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
 usensor1.start_ultrasound()
 usensor2.start_ultraasound()
 
