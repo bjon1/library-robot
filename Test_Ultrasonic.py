@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO
 import time
+from threading import Thread
 
 def stop_movement():
     print("Stopped Moving")
@@ -11,7 +12,8 @@ def check_distance(distance):
     return True
 
 class USensor:
-    def __init__(self, trig, echo):
+    def __init__(self, name, trig, echo):
+        self.name = name
         self.trig = trig
         self.echo = echo
 
@@ -25,7 +27,6 @@ class USensor:
 
     def start_ultrasound(self):
         self.configure()
-
         while True:
             try:
                 # send pulse
@@ -41,31 +42,52 @@ class USensor:
                         t = t_end - t_start
                         distance = ((t * 34300) / 2)/100
 
-                        print(f"Sensor1 Distance: {distance} meters")
+                        print(f"{self.name} Distance: {distance} meters")
 
                         if not check_distance(distance):
                             stop_movement()
                     else:
                         stop_movement()
-                        print('Sensor1 Falling edge timeout')
+                        print(f'{self.name} Falling edge timeout')
                 else:
-                    print('Sensor1 Rising edge timeout')
+                    print(f'{self.name} Rising edge timeout')
             except:
                 #Stop All Movement
-                GPIO.cleanup()
+                #GPIO.cleanup()
+                pass
 
             time.sleep(0.5)
 
+    def f1(self):
+        while True:
+            print("Hello1")
+
+    def f2(self):
+        while True:
+            print("Hello2")
+
+
 
 GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
-usensor1 = USensor(trig=16, echo=18)
-usensor2 = USensor(trig=19, echo=21)
-usensor1.start_ultrasound()
-usensor2.start_ultraasound()
+usensor1 = USensor(name="front1", trig=16, echo=18)
+usensor2 = USensor(name="front2", trig=19, echo=21)
+usensor3 = USensor(name="side1", trig=23, echo=24)
+
+t1 = Thread(target = usensor1.start_ultrasound)
+t2 = Thread(target = usensor2.start_ultrasound)
+t3 = Thread(target = usensor3.start_ultrasound)
+
+t1.start()
+t2.start()
+t3.start()
 
 
 
+'''
+t3 = Thread(target=usensor1.f1)
+t4 = Thread(target=usensor2.f2)
 
+t3.start()
+t4.start()
+'''
 
-
-    
