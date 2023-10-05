@@ -14,10 +14,7 @@ bus = smbus.SMBus(1)
 imu = MPU9250.MPU9250(bus, address)
 imu.begin()
 
-# imu.caliberateGyro()
-# imu.caliberateAccelerometer()
-# or load your own caliberation file
-#imu.loadCalibDataFromFile("/home/pi/calib_real4.json")
+imu.loadCalibDataFromFile("./data/calib.json")
 
 currTime = time.time()
 print_count = 0
@@ -36,4 +33,4 @@ while True:
 		print_count = 0
 
 	print_count = print_count + 1
-	time.sleep(0.01)
+	time.sleep(0.1)
