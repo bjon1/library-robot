@@ -59,7 +59,8 @@ def move(direction):
     stop() # This may not be needed or may cause bugs
     match direction:
         case "forward":
-            activate_pwm()
+            activate_pwm() 
+            # Need to check if activating PWM while it is already running will cause issues. If so, we need to check if PWM is active before calling this function
             GPIO.output(digOut_pin1, GPIO.LOW) # These values need to be checked
             GPIO.output(digOut_pin2, GPIO.LOW)
         case "left":
