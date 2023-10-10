@@ -30,22 +30,22 @@ def runTest():
 
     # Test forward for 5 seconds. User should be reading output of transistors 1 and 2 on the breadboard. 
     print("forward for 5 seconds...")
-    GPIO.output(digout_pin1, GPIO.LOW) # These values need to be checked
-    GPIO.output(digout_pin2, GPIO.LOW)
-    time.sleep(5)
-    
-    print("left for 5 seconds...")
-    GPIO.output(digout_pin1, GPIO.HIGH) # These values need to be checked
-    GPIO.output(digout_pin2, GPIO.LOW)
-    time.sleep(5)
-
-    print("reverse for 5 seconds...")
     GPIO.output(digout_pin1, GPIO.HIGH) # These values need to be checked
     GPIO.output(digout_pin2, GPIO.HIGH)
     time.sleep(5)
+    
+    print("left for 5 seconds...")
+    GPIO.output(digout_pin1, GPIO.LOW) # These values need to be checked
+    GPIO.output(digout_pin2, GPIO.HIGH)
+    time.sleep(5)
+
+    print("reverse for 5 seconds...")
+    GPIO.output(digout_pin1, GPIO.LOW) # These values need to be checked
+    GPIO.output(digout_pin2, GPIO.LOW)
+    time.sleep(5)
 
     print("right for 5 seconds...")
-    GPIO.output(digout_pin1, GPIO.LOW) # These values need to be checked
+    GPIO.output(digout_pin1, GPIO.HIGH) # These values need to be checked
     GPIO.output(digout_pin2, GPIO.LOW)
     time.sleep(5)
 
