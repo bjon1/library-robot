@@ -1,36 +1,32 @@
 import RPi.GPIO as GPIO
 import time
 
+# This script was written to test an intermediate circuit between the Jetson Nano and the H-Bridge.
+# This intermediate circuit utilizes two NPN transistors and one PNP
+
 # Set output pins
-output_pin1 = 32 #left
-output_pin2 = 33 #right
-digout_pin1 = 15 #left motor control
-digout_pin2 = 16 #right motor control
+output_pin1 = 32 #left pwm
+output_pin2 = 33 #right pwm
+digout_pin1 = 18 #left motor control 
+digout_pin2 = 16 #right motor control 
 
 # Define the pin numbers to BOARD mode
 GPIO.setmode(GPIO.BOARD)
 
-# Set the PWM pins to OUTPUT and HIGH
+# Set the PWM pins to OUTPUT and LOW
 GPIO.setup(output_pin1, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(output_pin2, GPIO.OUT, initial=GPIO.LOW)
 
-# Set the digital out pins to OUTPUT and LOW
 GPIO.setup(digout_pin1, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(digout_pin2, GPIO.OUT, initial=GPIO.LOW)
 
 def runTest():
-    # Start both PWM outputs with duty cycle of 100%
 
-    p1.start(100)
-    p2.start(100)
-
-    # Test forward for 5 seconds. User should be reading output of transistors 1 and 2 on the breadboard. 
     print("forward for 5 seconds...")
-    GPIO.output(digout_pin1, GPIO.HIGH) # These values need to be checked
-    GPIO.output(digout_pin2, GPIO.HIGH)  
+    GPIO.output(digout_pin1, GPIO.HIGH)
+    GPIO.output(digout_pin2, GPIO.HIGH)
     time.sleep(5)
-    
-    
+
     print("left for 5 seconds...")
     GPIO.output(digout_pin1, GPIO.LOW) # These values need to be checked
     GPIO.output(digout_pin2, GPIO.HIGH)
@@ -50,13 +46,15 @@ def runTest():
     p1.stop()
     p2.stop()
 
-    GPIO.cleanup(15)
-    GPIO.cleanup(16)
-
 
 # Create PWM Objects with frequency 25kHz
-p1 = GPIO.PWM(output_pin1, 25000)
+p1 = GPIO.PWM(output_pin1, 25000) 
 p2 = GPIO.PWM(output_pin2, 25000)
+p1.start(0)
+p1.ChangeDutyCycle(100)
+p2.start(0)
+p2.ChangeDutyCycle(100)
+
 runTest()
 
 
