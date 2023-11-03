@@ -6,8 +6,6 @@ import board
 import busio
 from adafruit_pca9685 import PCA9685
 import tkinter as tk
-from madgwickAHRS import MadgwickAHRS
-from imusensor.filters import madgwick
 from imusensor.filters import kalman 
 from mpu9250_i2c import *
 
@@ -77,30 +75,6 @@ def stop():
     set_motor_speed(right_reverse_pin, 0)
     print("stop")
 
-'''
-
-def calculate_orientation(accel_data, gyro_data, mag_data):
-    # Create an instance of the MadgwickAHRS class, with a sample period of 256 times per second
-    madgwick_filter = MadgwickAHRS(sampleperiod=1/256)
-
-    # Update the Madgwick filter with new sensor data
-    madgwick_filter.update(gyro_data, accel_data, mag_data)
-
-    # Get the current quaternion output from the filter
-    # A quaternion is a complex number that can be used to represent orientation in 3D space
-    q = madgwick_filter.quaternion
-
-    # Convert quaternion to Euler angles
-    roll, pitch, yaw = q.to_euler_angles()
-
-    # Convert to degrees
-    yaw *= 180.0 / math.pi
-    pitch *= 180.0 / math.pi
-    roll *= 180.0 / math.pi
-
-    return yaw, pitch, roll
-'''
-
 # Use Tkinter for UI
 def create_gui():
     # Create the main window
@@ -144,43 +118,3 @@ while True:
     print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(sensorfusion.roll, sensorfusion.pitch, sensorfusion.yaw))
 	
     time.sleep(0.01)
-
-'''
-sensorfusion = madgwick.Madgwick(0.5)
-currTime = time.time()
-print_count = 0
-while True:
-    ax, ay, az, wx, wy, wz = mpu6050_conv() # read and convert mpu6050 data
-    mx, my, mz = AK8963_conv()
-
-    for i in range(10):
-        newTime = time.time()
-        dt = newTime - currTime
-        currTime = newTime
-        
-        sensorfusion.updateRollPitchYaw(ax, ay, az, wx, wy, wz, mx, my, mz, dt)
-
-    if print_count == 2:
-        print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(sensorfusion.roll, sensorfusion.pitch, sensorfusion.yaw))
-        print_count = 0
-    print_count += 1
-    time.sleep(0.1)
-'''
-
-
-'''while True:
-    # Calculate the orientation
-    ax,ay,az,wx,wy,wz = mpu6050_conv() # read and convert mpu6050 data
-    mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
-
-    # Store variables in tuples
-    accel_data = [ax, ay, az]
-    gyro_data = [wx, wy, wz]
-    mag_data = [mx, my, mz]
-
-    yaw, pitch, roll = calculate_orientation(accel_data, gyro_data, mag_data)
-    print("YAW", yaw)
-    print("PITCH", pitch)
-    print("ROLL", roll)
-    
-    time.sleep(0.2)'''

@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 import time
 
 # This script was written to test an intermediate circuit between the Jetson Nano and the H-Bridge.
-# This intermediate circuit utilizes two NPN transistors and one PNP
+# The intermediate circuit utilizes two NPN transistors and one PNP
 
 # Set output pins
 output_pin1 = 32 #left pwm

@@ -15,6 +15,12 @@ class PIDController:
         output = (self.kp * error) + (self.ki * self.error_sum) + (self.kd * derivative)
         self.last_error = error
         return max(min(output, self.max_out), -self.max_out)
+    
+def get_yaw():
+    pass
+
+def set_motor_speed(pin, speed):
+    pass
 
 def cruise_control():
     target_yaw = get_yaw()  # capture the yaw at the moment the robot started moving forward
@@ -31,6 +37,9 @@ def cruise_control():
         # 50 is the base speed, but it may need to be changed depending on the minimum duty cycle of the motors
         left_speed = 50 + correction 
         right_speed = 50 - correction
+
+        left_forward_pin = 0 #placeholder
+        right_forward_pin = 1 #placeholder
 
         set_motor_speed(left_forward_pin, left_speed)
         set_motor_speed(right_forward_pin, right_speed)
