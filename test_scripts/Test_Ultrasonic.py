@@ -72,22 +72,4 @@ GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
 usensor1 = USensor(name="front1", trig=16, echo=18)
 usensor2 = USensor(name="front2", trig=19, echo=21)
 usensor3 = USensor(name="side1", trig=23, echo=24)
-
-t1 = Thread(target = usensor1.start_ultrasound)
-t2 = Thread(target = usensor2.start_ultrasound)
-t3 = Thread(target = usensor3.start_ultrasound)
-
-t1.start()
-t2.start()
-t3.start()
-
-
-
-'''
-t3 = Thread(target=usensor1.f1)
-t4 = Thread(target=usensor2.f2)
-
-t3.start()
-t4.start()
-'''
-
+usensor4 = USensor(name="side2", trig=26, echo=22)

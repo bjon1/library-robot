@@ -7,6 +7,7 @@ import numpy as np
 import tkinter as tk
 from imusensor.filters import kalman 
 from mpu9250_i2c import *
+from PIDController import PIDController
 from enum import Enum
 
 class States(Enum):
@@ -65,6 +66,31 @@ class Robot:
         self.set_motor_speed(self.left_forward_pin, speed)
         self.set_motor_speed(self.right_forward_pin, speed)
         print("Moving forward...")
+
+    # This should replace the move_forward() once it has been tested
+    def cruise_control(self): 
+        self.set_motor_speed(self.left_reverse_pin, 0)
+        self.set_motor_speed(self.right_reverse_pin, 0)
+        target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
+        pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, max_out=50) # values of kp, ki, and kd will need tuning
+
+        while True:
+            current_yaw = self.get_yaw()
+            error = target_yaw - current_yaw
+            dt = 0.01  # time step in seconds
+            time.sleep(dt)
+
+            correction = pid_controller.update(error, dt)
+            
+            # 50 is the base speed, but it may need to be changed depending on the minimum duty cycle of the motors
+            left_speed = 50 + correction 
+            right_speed = 50 - correction
+
+            left_forward_pin = 0 #placeholder
+            right_forward_pin = 1 #placeholder
+
+            self.set_motor_speed(left_forward_pin, left_speed)
+            self.set_motor_speed(right_forward_pin, right_speed)
 
     def turn_left(self, degrees):
         print("Turning left...")
@@ -139,23 +165,26 @@ class Robot:
     def set_state(self, state):
         self.state = state
 
-    # Function needs to be implemented later
     def start_movement(self):
-        # Main loop of the robot's behavior
-        while True:
-            if self.state == States.MOVING_FORWARD:
-                self.move_forward(speed=50)
-            elif self.state == States.MOVING_BACKWARD:
-                self.move_backward(speed=50)
-            elif self.state == States.TURNING_LEFT:
-                self.turn_left(degrees=90)
-            elif self.state == States.TURNING_RIGHT:
-                self.turn_right(degrees=90)
-            elif self.state == States.IDLE:
-                self.stop()
-            else:
-                raise Exception("Invalid state!")
+        current_state = self.state  # Get the initial state
 
+        while True:
+            if current_state != self.state:
+                # State has changed, handle it here
+                current_state = self.state  # Update the current state
+                if self.state == States.MOVING_FORWARD:
+                    self.move_forward(speed=50)
+                elif self.state == States.MOVING_BACKWARD:
+                    self.move_backward(speed=50)
+                elif self.state == States.TURNING_LEFT:
+                    self.turn_left(degrees=90)
+                elif self.state == States.TURNING_RIGHT:
+                    self.turn_right(degrees=90)
+                elif self.state == States.IDLE:
+                    self.stop()
+                else:
+                    raise Exception("Invalid state!")
+                
     '''
         robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
     '''
