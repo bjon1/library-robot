@@ -10,35 +10,39 @@ from imusensor.filters import kalman
 from mpu9250_i2c import *
 from PIDController import PIDController
 from USensor import USensor
-from enum import Enum
+from States import States
 from threading import Thread
-
-class States(Enum):
-    IDLE = 0
-    MOVING_FORWARD = 1
-    MOVING_BACKWARD = 2
-    TURNING_LEFT = 3
-    TURNING_RIGHT = 4
 
 class Robot:
 
+
+
     def __init__(self, pwm_frequency):
-        GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
-        # Initialize I2C
-        i2c = busio.I2C(board.SCL_1, board.SDA_1) # Pin 27, 28
-        # Initialize PCA9685 object and specify the PWM frequency
-        self.pca = PCA9685(i2c) 
+
+
+
+        # Initialize PCA9685 object with I2C
+        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) 
         self.pca.frequency = pwm_frequency  # Set PWM frequency to 50 Hz
         
-        # Define the PWM channels for the robot's motors
-        self.left_forward_pin = 0
-        self.left_reverse_pin = 1
-        self.right_forward_pin = 2
-        self.right_reverse_pin = 3
+        # Define the PWM channels for the robot's motors      
+        pins = {
+            "left_forward": 0,
+            "left_reverse": 1,
+            "right_forward": 2,
+            "right_reverse": 3
+        }
+          
+        self.left_forward_pin = pins.get("left_forward")
+        self.left_reverse_pin = pins.get("left_reverse")
+        self.right_forward_pin = pins.get("right_forward")
+        self.right_reverse_pin = pins.get("right_reverse")
 
         # Initialize the Kalman filter
         self.sensorfusion = kalman.Kalman()
         self.state = States.IDLE
+
+        self.state_queue = []
 
     def get_yaw(self):
         if self.sensorfusion.yaw == 0 and self.sensorfusion.roll == 0 and self.sensorfusion.pitch == 0:
@@ -62,19 +66,18 @@ class Robot:
         # Convert the speed to a PWM value (0 to 4095)
         pwm_value = int(speed * 40.95)
         self.pca.channels[pin].duty_cycle = pwm_value * 0x10000 // 4096
-        
-    def move_forward(self, speed):
+
+    # This should replace the move_forward() once it has been tested
+    def cruise_control(self, speed): 
+        time.sleep(5)
+        target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
+
         self.set_motor_speed(self.left_reverse_pin, 0)
         self.set_motor_speed(self.right_reverse_pin, 0)
         self.set_motor_speed(self.left_forward_pin, speed)
         self.set_motor_speed(self.right_forward_pin, speed)
         print("Moving forward...")
 
-    # This should replace the move_forward() once it has been tested
-    def cruise_control(self, speed): 
-        time.sleep(5)
-        target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
-        self.move_forward(speed)
         pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, max_out=100-speed) # values of kp, ki, and kd will need tuning
 
         while True:
@@ -92,7 +95,6 @@ class Robot:
             left_speed = speed + correction 
             right_speed = speed - correction
 
-            #Testing Purposes
             print("Left Speed", left_speed)
             print("Right Speed", right_speed)
             self.set_motor_speed(self.left_forward_pin, left_speed)
@@ -122,7 +124,7 @@ class Robot:
         while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
-            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at
+            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
             self.move_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
@@ -160,7 +162,7 @@ class Robot:
     '''
         start_sensorfusion() is a function that takes the values of the accelerometer, gyroscope, and magnetometer 
         and uses them to calculate the roll, pitch, and yaw of the robot using the Kalman Filter.
-        It should continuously run in the background and update the sensorfusion object as calculations and tasks are done.
+        It should continuously run in the background and update the sensorfusion object with yaw, roll, and pitch as calculations and tasks are done.
     '''
     def start_sensorfusion(self):
         currTime = time.time()
@@ -176,10 +178,20 @@ class Robot:
             
             time.sleep(0.05)
 
+    # set_state() should be the only way to change the direction of the robot.
+    # Later, have it update the state_queue instead of just setting the state
     def set_state(self, state):
-        self.state = state
+        # Ensure the state is valid
+        if state in States:
+            self.state = state
+        else:
+            raise Exception("Invalid state!")
 
-    def start_movement_process(self):
+    '''
+        start_movement_controller() is a function that should continuously run in the background and check the state of the robot.
+        It should call the appropriate function to move the robot based on the state. Later, it will also manage state_queue    
+    '''
+    def start_movement_controller(self):
         current_state = self.state  # Get the initial state
 
         while True:
@@ -200,6 +212,8 @@ class Robot:
                     raise Exception("Invalid state!")
                 
     def start_ultrasound(self):
+        GPIO.setmode(GPIO.BOARD)
+
         usensor1 = USensor(name="front1", trig=16, echo=18)
         usensor2 = USensor(name="front2", trig=19, echo=21)
         usensor3 = USensor(name="side1", trig=23, echo=24)
@@ -207,8 +221,12 @@ class Robot:
 
         while True:
             if(usensor1.send_ultrasound() or usensor2.send_ultrasound() or usensor3.send_ultrasound() or usensor4.send_ultrasound()):
-                self.set_state(States.IDLE) # Stop the robot if an object is detected           
+                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter        
             time.sleep(0.5)
+
+    def start_object_detection(self):
+        #TODO: Implement object detection
+        pass
                 
 '''
     robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
@@ -254,7 +272,7 @@ if __name__ == "__main__":
     t1.start()
     time.sleep(4) # Wait for the sensor fusion to start & initialize for accurate readings
     t2 = Thread(target=robot.start_ultrasound)
-    t3 = Thread(target=robot.start_movement_process)
+    t3 = Thread(target=robot.start_movement_controller)
     t2.start()
     t3.start()
 
