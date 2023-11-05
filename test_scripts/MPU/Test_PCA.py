@@ -1,11 +1,11 @@
 import time
-import busio
 import board
+import busio
 from adafruit_pca9685 import PCA9685
 import tkinter as tk
 
 # Initialize I2C
-i2c = busio.I2C(board.SCL_1, board.SDA_1)
+i2c = busio.I2C(scl=board.SCL_1, sda=board.SDA_1)
 
 # Initialize PCA9685 and specify the PWM frequency
 pca = PCA9685(i2c)

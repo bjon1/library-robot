@@ -9,6 +9,7 @@ from imusensor.filters import kalman
 from mpu9250_i2c import *
 from PIDController import PIDController
 from enum import Enum
+from threading import Thread
 
 class States(Enum):
     IDLE = 0
@@ -41,6 +42,7 @@ class Robot:
     def get_yaw(self):
         if self.sensorfusion.yaw == 0 and self.sensorfusion.roll == 0 and self.sensorfusion.pitch == 0:
             raise Exception("Sensor fusion has not been started. Call start_sensorfusion() first.")
+        print(self.sensorfusion.yaw)
         return self.sensorfusion.yaw
     
     def get_pitch(self):
@@ -69,6 +71,7 @@ class Robot:
 
     # This should replace the move_forward() once it has been tested
     def cruise_control(self): 
+        time.sleep(5)
         self.set_motor_speed(self.left_reverse_pin, 0)
         self.set_motor_speed(self.right_reverse_pin, 0)
         target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
@@ -77,6 +80,9 @@ class Robot:
         while True:
             current_yaw = self.get_yaw()
             error = target_yaw - current_yaw
+            print("Target", target_yaw)
+            print("Current", current_yaw)
+            print("error", error)
             dt = 0.01  # time step in seconds
             time.sleep(dt)
 
@@ -89,10 +95,15 @@ class Robot:
             left_forward_pin = 0 #placeholder
             right_forward_pin = 1 #placeholder
 
-            self.set_motor_speed(left_forward_pin, left_speed)
-            self.set_motor_speed(right_forward_pin, right_speed)
+            #Testing Purposes
+            print("Left Speed", left_speed)
+            print("Right Speed", right_speed)
+            #self.set_motor_speed(left_forward_pin, left_speed)
+            #self.set_motor_speed(right_forward_pin, right_speed)
+            time.sleep(1)
 
-    def turn_left(self, degrees):
+    def turn_left(self, degrees=90):
+        time.sleep(5) # For testing purposes
         print("Turning left...")
         current_yaw = self.get_yaw() # Get the yaw in degrees
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
@@ -102,7 +113,8 @@ class Robot:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at
-            self.move_counter_clock(turn_speed)
+            print("turn_speed",turn_speed)
+            self.move_counterclock(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
         self.stop()
@@ -158,9 +170,9 @@ class Robot:
             currTime = newTime
 
             self.sensorfusion.computeAndUpdateRollPitchYaw(ax, ay, az, wx, wy, wz, mx, my, mz, dt)
-            print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
+            #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
             
-            time.sleep(0.01)
+            time.sleep(0.05)
 
     def set_state(self, state):
         self.state = state
@@ -221,8 +233,12 @@ if __name__ == "__main__":
     robot = Robot(pwm_frequency=50)
 
     # Create threads to run processes simultaneously
+    t1 = Thread(target=robot.start_sensorfusion)
+    t2 = Thread(target=robot.turn_left)
 
-    # robot.start_sensorfusion() T1
+    t1.start()
+    t2.start()
+
     # robot.start_movement() T2
     # robot.start_ultrasound() T3
     # robot_controller_gui(robot, 50) T4
