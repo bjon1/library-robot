@@ -2,12 +2,14 @@ import math
 import time
 import board
 import busio
+import Jetson.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
 import numpy as np
 import tkinter as tk
 from imusensor.filters import kalman 
 from mpu9250_i2c import *
 from PIDController import PIDController
+from USensor import USensor
 from enum import Enum
 from threading import Thread
 
@@ -21,7 +23,7 @@ class States(Enum):
 class Robot:
 
     def __init__(self, pwm_frequency):
-
+        GPIO.setmode(GPIO.BOARD) #GPIO Mode BOARD
         # Initialize I2C
         i2c = busio.I2C(board.SCL_1, board.SDA_1) # Pin 27, 28
         # Initialize PCA9685 object and specify the PWM frequency
@@ -36,7 +38,6 @@ class Robot:
 
         # Initialize the Kalman filter
         self.sensorfusion = kalman.Kalman()
-
         self.state = States.IDLE
 
     def get_yaw(self):
@@ -70,12 +71,11 @@ class Robot:
         print("Moving forward...")
 
     # This should replace the move_forward() once it has been tested
-    def cruise_control(self): 
+    def cruise_control(self, speed): 
         time.sleep(5)
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, 0)
         target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
-        pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, max_out=50) # values of kp, ki, and kd will need tuning
+        self.move_forward(speed)
+        pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, max_out=100-speed) # values of kp, ki, and kd will need tuning
 
         while True:
             current_yaw = self.get_yaw()
@@ -89,22 +89,17 @@ class Robot:
             correction = pid_controller.update(error, dt)
             
             # 50 is the base speed, but it may need to be changed depending on the minimum duty cycle of the motors
-            left_speed = 50 + correction 
-            right_speed = 50 - correction
-
-            left_forward_pin = 0 #placeholder
-            right_forward_pin = 1 #placeholder
+            left_speed = speed + correction 
+            right_speed = speed - correction
 
             #Testing Purposes
             print("Left Speed", left_speed)
             print("Right Speed", right_speed)
-            #self.set_motor_speed(left_forward_pin, left_speed)
-            #self.set_motor_speed(right_forward_pin, right_speed)
+            self.set_motor_speed(self.left_forward_pin, left_speed)
+            self.set_motor_speed(self.right_forward_pin, right_speed)
             time.sleep(1)
 
     def turn_left(self, degrees=90):
-        time.sleep(5) # For testing purposes
-        print("Turning left...")
         current_yaw = self.get_yaw() # Get the yaw in degrees
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
@@ -112,20 +107,27 @@ class Robot:
         while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
-            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at
-            print("turn_speed",turn_speed)
+            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
+            print("turn_speed", turn_speed)
             self.move_counterclock(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
         self.stop()
 
-    # Function needs to be implemented later, after turn_left is tested
-    def turn_right(self, speed):
-        self.set_motor_speed(self.left_forward_pin, speed)
-        self.set_motor_speed(self.right_forward_pin, 0)
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, speed)
-        print("Turning right...")
+    def turn_right(self, degrees=90):
+        current_yaw = self.get_yaw() # Get the yaw in degrees
+        yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
+        yaw_left = degrees # Calculate how much yaw is left to turn
+        error = 5 # Error in degrees
+        while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
+            current_yaw = self.get_yaw() # Get the current yaw
+            yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
+            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at
+            print("turn_speed", turn_speed)
+            self.move_clockwise(turn_speed)
+            print("yaw_left: ", yaw_left)
+            time.sleep(0.5)
+        self.stop()
 
     def move_reverse(self, speed):
         self.set_motor_speed(self.left_forward_pin, 0)
@@ -163,7 +165,7 @@ class Robot:
     def start_sensorfusion(self):
         currTime = time.time()
         while True:
-            ax, ay, az, wx, wy, wz = mpu6050_conv() # re ad and convert mpu6050 data
+            ax, ay, az, wx, wy, wz = mpu6050_conv() # read and convert mpu6050 data
             mx, my, mz = AK8963_conv()
             newTime = time.time()
             dt = newTime - currTime
@@ -177,7 +179,7 @@ class Robot:
     def set_state(self, state):
         self.state = state
 
-    def start_movement(self):
+    def start_movement_process(self):
         current_state = self.state  # Get the initial state
 
         while True:
@@ -185,7 +187,7 @@ class Robot:
                 # State has changed, handle it here
                 current_state = self.state  # Update the current state
                 if self.state == States.MOVING_FORWARD:
-                    self.move_forward(speed=50)
+                    self.cruise_control(speed=50)
                 elif self.state == States.MOVING_BACKWARD:
                     self.move_backward(speed=50)
                 elif self.state == States.TURNING_LEFT:
@@ -197,51 +199,64 @@ class Robot:
                 else:
                     raise Exception("Invalid state!")
                 
-    '''
-        robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
-    '''
-    def robot_controller_gui(robot, speed):
-        # Create the main window
-        root = tk.Tk()
-        root.title("Henry Control")
+    def start_ultrasound(self):
+        usensor1 = USensor(name="front1", trig=16, echo=18)
+        usensor2 = USensor(name="front2", trig=19, echo=21)
+        usensor3 = USensor(name="side1", trig=23, echo=24)
+        usensor4 = USensor(name="side2", trig=26, echo=22)
 
-        # Create a frame to contain the buttons
-        button_frame = tk.Frame(root)
-        button_frame.pack(padx=20, pady=20)
+        while True:
+            if(usensor1.send_ultrasound() or usensor2.send_ultrasound() or usensor3.send_ultrasound() or usensor4.send_ultrasound()):
+                self.set_state(States.IDLE) # Stop the robot if an object is detected           
+            time.sleep(0.5)
+                
+'''
+    robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
+'''
+def robot_controller_gui(robot):
+    # Create the main window
+    root = tk.Tk()
+    root.title("Henry Control")
 
-        # Create and configure buttons
-        # Note: The lambda function is used to pass a parameter to the function called by the button
-        # Note: IN THE FUTURE, the command parameters should call functions that change the robot's state
-        button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.move_forward(speed))
-        button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.move_reverse(speed))
-        button_left = tk.Button(button_frame, text="Left", command=lambda: robot.move_counterclock(speed))
-        button_right= tk.Button(button_frame, text="Right", command=lambda: robot.move_clockwise(speed))
-        button_stop = tk.Button(button_frame, text="Stop", command=lambda: robot.stop(speed))
+    # Create a frame to contain the buttons
+    button_frame = tk.Frame(root)
+    button_frame.pack(padx=20, pady=20)
 
-        # Pack the buttons
-        button_forward.pack(side=tk.LEFT, padx=10)
-        button_left.pack(side=tk.LEFT, padx=10)
-        button_right.pack(side=tk.LEFT, padx=10)
-        button_reverse.pack(side=tk.LEFT, padx=10)
-        button_stop.pack(side=tk.LEFT, padx=10)
+    # Create and configure buttons
+    # Note: The lambda function is used to pass a parameter to the function called by the button
+    # Note: IN THE FUTURE, the command parameters should call functions that change the robot's state
+    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.MOVING_FORWARD))
+    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
+    button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
+    button_right= tk.Button(button_frame, text="Right", command=lambda: robot.set_state(States.TURNING_RIGHT))
+    button_stop = tk.Button(button_frame, text="Stop", command=lambda: robot.set_state(States.IDLE))
 
-        # Start the Tkinter main loop
-        root.mainloop()
+    # Pack the buttons
+    button_forward.pack(side=tk.LEFT, padx=10)
+    button_left.pack(side=tk.LEFT, padx=10)
+    button_right.pack(side=tk.LEFT, padx=10)
+    button_reverse.pack(side=tk.LEFT, padx=10)
+    button_stop.pack(side=tk.LEFT, padx=10)
+
+    # Start the Tkinter main loop
+    root.mainloop()
+
 
 if __name__ == "__main__":
     # Main logic for your script goes here
     robot = Robot(pwm_frequency=50)
 
+    # Start the Control GUI
+    robot_controller_gui(robot)
+
     # Create threads to run processes simultaneously
     t1 = Thread(target=robot.start_sensorfusion)
-    t2 = Thread(target=robot.turn_left)
-
     t1.start()
+    time.sleep(4) # Wait for the sensor fusion to start & initialize for accurate readings
+    t2 = Thread(target=robot.start_ultrasound)
+    t3 = Thread(target=robot.start_movement_process)
     t2.start()
+    t3.start()
 
-    # robot.start_movement() T2
-    # robot.start_ultrasound() T3
-    # robot_controller_gui(robot, 50) T4
-
-    # robot.start_object_detection() T5
-    # robot.start_pathfinding() T6
+    # robot.start_object_detection() T4
+    # robot.start_pathfinding() T5
