@@ -253,7 +253,6 @@ def robot_controller_gui(robot):
 
     # Create and configure buttons
     # Note: The lambda function is used to pass a parameter to the function called by the button
-    # Note: IN THE FUTURE, the command parameters should call functions that change the robot's state
     button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.MOVING_FORWARD))
     button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
     button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
