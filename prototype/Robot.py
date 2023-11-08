@@ -201,7 +201,7 @@ class Robot:
                 if self.state == States.MOVING_FORWARD:
                     self.cruise_control(speed=50)
                 elif self.state == States.MOVING_BACKWARD:
-                    self.move_backward(speed=50)
+                    self.move_reverse(speed=50)
                 elif self.state == States.TURNING_LEFT:
                     self.turn_left(degrees=90)
                 elif self.state == States.TURNING_RIGHT:
@@ -265,8 +265,14 @@ if __name__ == "__main__":
     robot = Robot(pwm_frequency=50)
 
     # Start the Control GUI
-    robot_controller_gui(robot)
+    t3 = Thread(target=robot.start_movement_controller)
+    t3.start()
+    print("got here1")
 
+    robot.set_state(States.MOVING_BACKWARD)
+    print("got here2")
+
+    '''
     # Create threads to run processes simultaneously
     t1 = Thread(target=robot.start_sensorfusion)
     t1.start()
@@ -278,3 +284,4 @@ if __name__ == "__main__":
 
     # robot.start_object_detection() T4
     # robot.start_pathfinding() T5
+    '''
