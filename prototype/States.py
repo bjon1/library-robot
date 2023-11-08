@@ -6,4 +6,6 @@ class States(Enum):
     MOVING_BACKWARD = 2
     TURNING_LEFT = 3
     TURNING_RIGHT = 4
-    REVERSE = 5
+    CLOCKWISE = 5
+    COUNTER_CLOCKWISE = 6
+    

@@ -111,7 +111,7 @@ class Robot:
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
-            self.move_counterclock(turn_speed)
+            self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
         self.stop()
@@ -126,10 +126,17 @@ class Robot:
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
             turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
-            self.move_clockwise(turn_speed)
+            self.clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
         self.stop()
+
+    def move_forward(self, speed):
+        self.set_motor_speed(self.left_reverse_pin, 0)
+        self.set_motor_speed(self.right_reverse_pin, 0)
+        self.set_motor_speed(self.left_forward_pin, speed)
+        self.set_motor_speed(self.right_forward_pin, speed)
+        print("Moving forward")
 
     def move_reverse(self, speed):
         self.set_motor_speed(self.left_forward_pin, 0)
@@ -145,19 +152,19 @@ class Robot:
         self.set_motor_speed(self.right_reverse_pin, 0)
         print("stop")
 
-    def move_counterclock(self, speed):
-        self.set_motor_speed(self.left_forward_pin, 0)
-        self.set_motor_speed(self.right_forward_pin, speed)
-        self.set_motor_speed(self.left_reverse_pin, speed)
-        self.set_motor_speed(self.right_reverse_pin, 0)
-        print("Moving counter clockwise...")
-    
-    def move_clockwise(self, speed):
+    def clockwise(self, speed):
         self.set_motor_speed(self.left_forward_pin, speed)
         self.set_motor_speed(self.right_forward_pin, 0)
         self.set_motor_speed(self.left_reverse_pin, 0)
         self.set_motor_speed(self.right_reverse_pin, speed)
         print("Moving clockwise...")
+
+    def counter_clockwise(self, speed):
+        self.set_motor_speed(self.left_forward_pin, 0)
+        self.set_motor_speed(self.right_forward_pin, speed)
+        self.set_motor_speed(self.left_reverse_pin, speed)
+        self.set_motor_speed(self.right_reverse_pin, 0)
+        print("Moving counter clockwise...")
 
     '''
         start_sensorfusion() is a function that takes the values of the accelerometer, gyroscope, and magnetometer 
@@ -199,7 +206,7 @@ class Robot:
                 # State has changed, handle it here
                 current_state = self.state  # Update the current state
                 if self.state == States.MOVING_FORWARD:
-                    self.cruise_control(speed=50)
+                    self.move_forward(speed=50) #self.cruise_control(speed=50)
                 elif self.state == States.MOVING_BACKWARD:
                     self.move_reverse(speed=50)
                 elif self.state == States.TURNING_LEFT:
@@ -208,6 +215,10 @@ class Robot:
                     self.turn_right(degrees=90)
                 elif self.state == States.IDLE:
                     self.stop()
+                elif self.state == States.CLOCKWISE:
+                    self.clockwise(speed=50)
+                elif self.state == States.COUNTER_CLOCKWISE:
+                    self.counter_clockwise(speed=50)
                 else:
                     raise Exception("Invalid state!")
                 
@@ -264,15 +275,20 @@ if __name__ == "__main__":
     # Main logic for your script goes here
     robot = Robot(pwm_frequency=50)
 
-    # Start the Control GUI
-    t3 = Thread(target=robot.start_movement_controller)
+    t1 = Thread(target=robot.start_movement_controller)
+    t2 = Thread(target=robot.start_sensorfusion)
+    t3 = Thread(target=lambda: robot_controller_gui(robot))
+    t1.start()
+    print("got here")
+    t2.start()
+    print("got here")
     t3.start()
-    print("got here1")
 
-    robot.set_state(States.MOVING_BACKWARD)
+    #robot.set_state(States.MOVING_FORWARD)
     print("got here2")
 
-    '''
+
+    ''' replace this with multiprocessing
     # Create threads to run processes simultaneously
     t1 = Thread(target=robot.start_sensorfusion)
     t1.start()
