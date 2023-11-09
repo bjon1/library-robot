@@ -233,7 +233,7 @@ def mpu_plot_test():
     #############################
     #
     ii_iter = 0 # plot update iteration counter 
-    cal_rot_indicies = [[6,7],[7,8],[6,8]] # heading indices
+    cal_rot_indicies = [[6,7],[7,8],[6,8]] # heading indices cal_rot_indicies = [[6,7],[7,8],[6,8]]
     while True:
         try:
             ax,ay,az,wx,wy,wz = mpu6050_conv() # read and convert mpu6050 data
@@ -248,8 +248,9 @@ def mpu_plot_test():
             [fig.canvas.restore_region(ax_bgnds[tt]) for tt in range(0,len(ax_bgnds))] # restore backgrounds
             for ii in range(0,9):
                 if ii in range(0,3):
-                    lines[ii].set_ydata(cal_offsets[ii][0]*mpu_array[:,ii]+\
-                                        cal_offsets[ii][1]) # update accel data array
+                    y_data = cal_offsets[ii][0]*mpu_array[:,ii]+\
+                                        cal_offsets[ii][1]
+                    lines[ii].set_ydata(y_data) # update accel data array
                     axs[0].draw_artist(lines[ii]) # update accel plot
                 if ii in range(3,6):
                     lines[ii].set_ydata(np.array(mpu_array[:,ii])-cal_offsets[ii]) # update gyro data
@@ -266,6 +267,7 @@ def mpu_plot_test():
                     theta = np.arctan2(-y_prime,x_prime) # angle vector for heading
                     lines[int(ii+jj)].set_ydata(mpu_array[:,ii]-\
                                             cal_offsets[cal_rot_indicies[jj][0]]) # update mag data
+                    
 ##                    lines[int(ii+jj+1)].set_data(x_prime,y_prime) # update heading data
                     lines[int(ii+jj+1)].set_data(theta,r_var)
                     axs[2].draw_artist(lines[int(ii+jj)]) # update mag plot

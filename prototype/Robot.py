@@ -12,6 +12,7 @@ from PIDController import PIDController
 from USensor import USensor
 from States import States
 from threading import Thread
+import csv
 
 class Robot:
 
@@ -110,7 +111,7 @@ class Robot:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
-            print("turn_speed", turn_speed)
+            #print("turn_speed", turn_speed)
             self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
@@ -172,18 +173,40 @@ class Robot:
         It should continuously run in the background and update the sensorfusion object with yaw, roll, and pitch as calculations and tasks are done.
     '''
     def start_sensorfusion(self):
+
+        cal_filename = 'mpu9250_cal_params.csv'
+
+        # Open the calibration file and store the offsets into cal_offsets
+        cal_offsets = np.array([[],[],[],0.0,0.0,0.0,[],[],[]]) # cal vector
+        with open(cal_filename,'r',newline='') as csvfile:
+            reader = csv.reader(csvfile,delimiter=',')
+            iter_ii = 0
+            for row in reader:
+                if len(row)>2:
+                    row_vals = [float(ii) for ii in row[int((len(row)/2)+1):]]
+                    cal_offsets[iter_ii] = row_vals
+                else:
+                    cal_offsets[iter_ii] = float(row[1])
+                iter_ii+=1
+
         currTime = time.time()
         while True:
-            ax, ay, az, wx, wy, wz = mpu6050_conv() # read and convert mpu6050 data
-            mx, my, mz = AK8963_conv()
+            ax,ay,az,wx,wy,wz = mpu6050_conv() # read and convert mpu6050 data
+            mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
+
+            mx = mx - cal_offsets[6]
+            my = my - cal_offsets[7]
+            mz = mz - cal_offsets[8]
+            #print(ax)
             newTime = time.time()
             dt = newTime - currTime
             currTime = newTime
 
             self.sensorfusion.computeAndUpdateRollPitchYaw(ax, ay, az, wx, wy, wz, mx, my, mz, dt)
-            #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
+            print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
             
-            time.sleep(0.05)
+            time.sleep(0.5)
+           
 
     # set_state() should be the only way to change the direction of the robot.
     # Later, have it update the state_queue instead of just setting the state
