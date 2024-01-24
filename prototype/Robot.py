@@ -12,6 +12,7 @@ from PIDController import PIDController
 from USensor import USensor
 from States import States
 from threading import Thread
+from multiprocessing import Process
 import csv
 
 class Robot:
@@ -23,7 +24,7 @@ class Robot:
 
 
         # Initialize PCA9685 object with I2C
-        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) 
+        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) #27, 28
         self.pca.frequency = pwm_frequency  # Set PWM frequency to 50 Hz
         
         # Define the PWM channels for the robot's motors      
@@ -173,7 +174,6 @@ class Robot:
         It should continuously run in the background and update the sensorfusion object with yaw, roll, and pitch as calculations and tasks are done.
     '''
     def start_sensorfusion(self):
-
         cal_filename = 'mpu9250_cal_params.csv'
 
         # Open the calibration file and store the offsets into cal_offsets
@@ -191,6 +191,7 @@ class Robot:
 
         currTime = time.time()
         while True:
+            print("test")
             ax,ay,az,wx,wy,wz = mpu6050_conv() # read and convert mpu6050 data
             mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
 
@@ -294,9 +295,8 @@ def robot_controller_gui(robot):
 
 
 if __name__ == "__main__":
-    # Main logic for your script goes here
     robot = Robot(pwm_frequency=50)
-
+    
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
     t3 = Thread(target=lambda: robot_controller_gui(robot))
@@ -305,12 +305,24 @@ if __name__ == "__main__":
     t2.start()
     print("got here")
     t3.start()
+    
+
+    '''
+    p1 = Process(target=robot.start_movement_controller)
+    p2 = Process(target=robot.start_sensorfusion)
+    p3 = Process(target=lambda: robot_controller_gui(robot)) #replace this process with keyboard arrow key controls
+    p1.start()
+    print("got here")
+    p2.start()
+    print("got here")
+    p3.start()
+    '''
 
     #robot.set_state(States.MOVING_FORWARD)
     print("got here2")
 
 
-    ''' replace this with multiprocessing
+    ''' Overall sequence; to be replaced by Process class
     # Create threads to run processes simultaneously
     t1 = Thread(target=robot.start_sensorfusion)
     t1.start()
