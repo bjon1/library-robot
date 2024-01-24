@@ -116,7 +116,7 @@ class Robot:
             self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
-        self.stop()
+        self.set_state(States.IDLE)
 
     def turn_right(self, degrees=90):
         current_yaw = self.get_yaw() # Get the yaw in degrees
@@ -131,7 +131,7 @@ class Robot:
             self.clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.5)
-        self.stop()
+        self.set_state(States.IDLE)
 
     def move_forward(self, speed):
         self.set_motor_speed(self.left_reverse_pin, 0)
