@@ -2,6 +2,7 @@ import math
 import time
 import board
 import busio
+import keyboard
 import Jetson.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
 import numpy as np
@@ -293,13 +294,28 @@ def robot_controller_gui(robot):
     # Start the Tkinter main loop
     root.mainloop()
 
+def robot_controller_keyboard(robot):
+    while True:
+        if keyboard.is_pressed('up'):
+            robot.set_state(States.MOVING_FORWARD)
+        elif keyboard.is_pressed('down'):
+            robot.set_state(States.MOVING_BACKWARD)
+        elif keyboard.is_pressed('left'):
+            robot.set_state(States.TURNING_LEFT)
+        elif keyboard.is_pressed('right'):
+            robot.set_state(States.TURNING_RIGHT)
+        else:
+            robot.set_state(States.IDLE)
+
+
+
 
 if __name__ == "__main__":
     robot = Robot(pwm_frequency=50)
     
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
-    t3 = Thread(target=lambda: robot_controller_gui(robot))
+    t3 = Thread(target=lambda: robot_controller_keyboard(robot))
     t1.start()
     print("got here")
     t2.start()
