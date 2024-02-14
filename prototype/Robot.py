@@ -112,11 +112,11 @@ class Robot:
         while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
-            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
+            turn_speed = 65 + 25*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             #print("turn_speed", turn_speed)
             self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
-            time.sleep(0.5)
+            time.sleep(0.15)
         self.set_state(States.IDLE)
 
     def turn_right(self, degrees=90):
@@ -127,11 +127,11 @@ class Robot:
         while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
-            turn_speed = 50 + 50*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
+            turn_speed = 65 + 25*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
             self.clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
-            time.sleep(0.5)
+            time.sleep(0.15)
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
@@ -169,46 +169,65 @@ class Robot:
         self.set_motor_speed(self.right_reverse_pin, 0)
         print("Moving counter clockwise...")
 
+
     '''
         start_sensorfusion() is a function that takes the values of the accelerometer, gyroscope, and magnetometer 
         and uses them to calculate the roll, pitch, and yaw of the robot using the Kalman Filter.
         It should continuously run in the background and update the sensorfusion object with yaw, roll, and pitch as calculations and tasks are done.
     '''
     def start_sensorfusion(self):
-        cal_filename = 'mpu9250_cal_params.csv'
 
-        # Open the calibration file and store the offsets into cal_offsets
-        cal_offsets = np.array([[],[],[],0.0,0.0,0.0,[],[],[]]) # cal vector
-        with open(cal_filename,'r',newline='') as csvfile:
-            reader = csv.reader(csvfile,delimiter=',')
-            iter_ii = 0
-            for row in reader:
-                if len(row)>2:
-                    row_vals = [float(ii) for ii in row[int((len(row)/2)+1):]]
-                    cal_offsets[iter_ii] = row_vals
-                else:
-                    cal_offsets[iter_ii] = float(row[1])
-                iter_ii+=1
+        # Calculate Error First. Make sure the robot is stationary
+        ax_error, ay_error, az_error, gx_error, gy_error, gz_error = 0, 0, 0, 0, 0, 0
 
-        currTime = time.time()
+        for i in range(200):
+            if self.state != States.IDLE:
+                raise Exception("Robot is not stationary! Please ensure the robot is stationary before starting sensor fusion.")
+            ax,ay,az,gx,gy,gz = mpu6050_conv()
+            ax_error += (math.atan((ay) / math.sqrt(pow((ax), 2) + pow((az), 2))) * 180 / math.pi)
+            ay_error += (math.atan(-1 * (ax) / math.sqrt(pow((ay), 2) + pow((az), 2))) * 180 / math.pi)
+            gx_error += gx
+            gy_error += gy
+            gz_error += gz
+        
+        # Calculate the average error
+        ax_error = ax_error/200
+        ay_error = ay_error/200
+        gx_error = gx_error/200
+        gy_error = gy_error/200
+        gz_error = gz_error/200
+        
+        t_current = time.time()
+
         while True:
-            print("test")
-            ax,ay,az,wx,wy,wz = mpu6050_conv() # read and convert mpu6050 data
-            mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
+            ax,ay,az,gx,gy,gz = mpu6050_conv() # read and convert mpu6050 data
+            #mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
 
-            mx = mx - cal_offsets[6]
-            my = my - cal_offsets[7]
-            mz = mz - cal_offsets[8]
-            #print(ax)
-            newTime = time.time()
-            dt = newTime - currTime
-            currTime = newTime
+            a_roll = (math.atan(ay / math.sqrt(pow(ax, 2) + pow(az, 2))) * 180 / math.pi) - ax_error
+            a_pitch = (math.atan(-1 * ax / math.sqrt(pow(ay, 2) + pow(az, 2))) * 180 / math.pi) - ay_error
 
-            self.sensorfusion.computeAndUpdateRollPitchYaw(ax, ay, az, wx, wy, wz, mx, my, mz, dt)
+            t_previous = t_current
+            t_current = time.time()
+            dt = t_current - t_previous # make sure this is in seconds
+
+            gx -= gx_error
+            gy -= gy_error
+            gz -= gz_error
+
+            g_roll += gx * dt
+            g_pitch += gy * dt
+            yaw += gz * dt
+
+            # complementary filter
+            self.sensorfusion.roll = (0.96 * g_roll) + (0.04 * a_roll) 
+            self.sensorfusion.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
+            self.sensorfusion.yaw = yaw
+
             print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
+
+
+            time.sleep(0.20) #5Hz
             
-            time.sleep(0.5)
-           
 
     # set_state() should be the only way to change the direction of the robot.
     # Later, have it update the state_queue instead of just setting the state
@@ -282,12 +301,16 @@ def robot_controller_gui(robot):
     button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
     button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
     button_right= tk.Button(button_frame, text="Right", command=lambda: robot.set_state(States.TURNING_RIGHT))
+    button_clockwise= tk.Button(button_frame, text="Clockwise", command=lambda: robot.set_state(States.CLOCKWISE))
+    button_counter_clockwise= tk.Button(button_frame, text="Counter Clockwise", command=lambda: robot.set_state(States.COUNTER_CLOCKWISE))
     button_stop = tk.Button(button_frame, text="Stop", command=lambda: robot.set_state(States.IDLE))
 
     # Pack the buttons
     button_forward.pack(side=tk.LEFT, padx=10)
     button_left.pack(side=tk.LEFT, padx=10)
     button_right.pack(side=tk.LEFT, padx=10)
+    button_clockwise.pack(side=tk.LEFT, padx=10)
+    button_counter_clockwise.pack(side=tk.LEFT, padx=10)
     button_reverse.pack(side=tk.LEFT, padx=10)
     button_stop.pack(side=tk.LEFT, padx=10)
 
@@ -306,8 +329,6 @@ def robot_controller_keyboard(robot):
             robot.set_state(States.TURNING_RIGHT)
         else:
             robot.set_state(States.IDLE)
-
-
 
 
 if __name__ == "__main__":
