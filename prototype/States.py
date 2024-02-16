@@ -8,4 +8,5 @@ class States(Enum):
     TURNING_RIGHT = 4
     CLOCKWISE = 5
     COUNTER_CLOCKWISE = 6
+    CRUISE = 7
     

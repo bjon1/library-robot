@@ -72,7 +72,7 @@ class Robot:
 
     # This should replace the move_forward() once it has been tested
     def cruise_control(self, speed): 
-        time.sleep(5)
+        time.sleep(3)
         target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
 
         self.set_motor_speed(self.left_reverse_pin, 0)
@@ -81,9 +81,9 @@ class Robot:
         self.set_motor_speed(self.right_forward_pin, speed)
         print("Moving forward...")
 
-        pid_controller = PIDController(kp=1.0, ki=0.1, kd=0.01, max_out=100-speed) # values of kp, ki, and kd will need tuning
+        pid_controller = PIDController(kp=10.0, ki=0.10, kd=0.10, max_out=100-speed) # values of kp, ki, and kd will need tuning
 
-        while True:
+        while self.state == States.CRUISE:
             current_yaw = self.get_yaw()
             error = target_yaw - current_yaw
             print("Target", target_yaw)
@@ -102,36 +102,37 @@ class Robot:
             print("Right Speed", right_speed)
             self.set_motor_speed(self.left_forward_pin, left_speed)
             self.set_motor_speed(self.right_forward_pin, right_speed)
-            time.sleep(1)
+            time.sleep(0.2)
 
     def turn_left(self, degrees=90):
         current_yaw = self.get_yaw() # Get the yaw in degrees
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
-        error = 5 # Error in degrees
-        while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
+        error = 0.2 # Error in degrees
+        while abs(yaw_left) < error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
-            turn_speed = 65 + 25*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
+            turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             #print("turn_speed", turn_speed)
             self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
-            time.sleep(0.15)
+            time.sleep(0.1)
         self.set_state(States.IDLE)
 
     def turn_right(self, degrees=90):
         current_yaw = self.get_yaw() # Get the yaw in degrees
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
-        error = 5 # Error in degrees
-        while not yaw_to_be - error <= current_yaw <= yaw_to_be + error: # While the yaw is not within the error range
+        error = 0.2
+        while abs(yaw_left) < error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
+
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
-            turn_speed = 65 + 25*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
+            turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
             self.clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
-            time.sleep(0.15)
+            time.sleep(0.1)
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
@@ -196,23 +197,27 @@ class Robot:
         gx_error = gx_error/200
         gy_error = gy_error/200
         gz_error = gz_error/200
-        
-        t_current = time.time()
 
+        g_roll = 0
+        g_pitch = 0
+        yaw = 0
+    
+        t_current = time.time()
         while True:
+            
             ax,ay,az,gx,gy,gz = mpu6050_conv() # read and convert mpu6050 data
             #mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
 
             a_roll = (math.atan(ay / math.sqrt(pow(ax, 2) + pow(az, 2))) * 180 / math.pi) - ax_error
             a_pitch = (math.atan(-1 * ax / math.sqrt(pow(ay, 2) + pow(az, 2))) * 180 / math.pi) - ay_error
 
-            t_previous = t_current
-            t_current = time.time()
-            dt = t_current - t_previous # make sure this is in seconds
-
             gx -= gx_error
             gy -= gy_error
             gz -= gz_error
+
+            t_previous = t_current
+            t_current = time.time()
+            dt = t_current - t_previous # make sure this is in seconds
 
             g_roll += gx * dt
             g_pitch += gy * dt
@@ -226,7 +231,7 @@ class Robot:
             print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
 
 
-            time.sleep(0.20) #5Hz
+            time.sleep(.1) #5Hz
             
 
     # set_state() should be the only way to change the direction of the robot.
@@ -263,6 +268,8 @@ class Robot:
                     self.clockwise(speed=50)
                 elif self.state == States.COUNTER_CLOCKWISE:
                     self.counter_clockwise(speed=50)
+                elif self.state == States.CRUISE:
+                    self.cruise_control(speed=50)
                 else:
                     raise Exception("Invalid state!")
                 
@@ -297,6 +304,8 @@ def robot_controller_gui(robot):
 
     # Create and configure buttons
     # Note: The lambda function is used to pass a parameter to the function called by the button
+
+    button_cruise = tk.Button(button_frame, text="Cruise", command=lambda: robot.set_state(States.CRUISE))
     button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.MOVING_FORWARD))
     button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
     button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
@@ -306,6 +315,7 @@ def robot_controller_gui(robot):
     button_stop = tk.Button(button_frame, text="Stop", command=lambda: robot.set_state(States.IDLE))
 
     # Pack the buttons
+    button_cruise.pack(side=tk.LEFT, padx=10)
     button_forward.pack(side=tk.LEFT, padx=10)
     button_left.pack(side=tk.LEFT, padx=10)
     button_right.pack(side=tk.LEFT, padx=10)
@@ -336,7 +346,7 @@ if __name__ == "__main__":
     
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
-    t3 = Thread(target=lambda: robot_controller_keyboard(robot))
+    t3 = Thread(target=lambda: robot_controller_gui(robot))
     t1.start()
     print("got here")
     t2.start()
@@ -347,7 +357,7 @@ if __name__ == "__main__":
     '''
     p1 = Process(target=robot.start_movement_controller)
     p2 = Process(target=robot.start_sensorfusion)
-    p3 = Process(target=lambda: robot_controller_gui(robot)) #replace this process with keyboard arrow key controls
+    p3 = Process(target=lambda: robot_controller_keyboard(robot)) #replace this process with keyboard arrow key controls
     p1.start()
     print("got here")
     p2.start()
