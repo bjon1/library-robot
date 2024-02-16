@@ -136,18 +136,20 @@ class Robot:
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, 0)
-        self.set_motor_speed(self.left_forward_pin, speed)
-        self.set_motor_speed(self.right_forward_pin, speed)
-        print("Moving forward")
+        while self.state == States.MOVING_FORWARD:
+            self.set_motor_speed(self.left_reverse_pin, 0)
+            self.set_motor_speed(self.right_reverse_pin, 0)
+            self.set_motor_speed(self.left_forward_pin, speed)
+            self.set_motor_speed(self.right_forward_pin, speed)
+            print("Moving forward")
 
     def move_reverse(self, speed):
-        self.set_motor_speed(self.left_forward_pin, 0)
-        self.set_motor_speed(self.right_forward_pin, 0)
-        self.set_motor_speed(self.left_reverse_pin, speed)
-        self.set_motor_speed(self.right_reverse_pin, speed)
-        print("Moving in reverse...")
+        while self.state == States.MOVING_BACKWARD:
+            self.set_motor_speed(self.left_forward_pin, 0)
+            self.set_motor_speed(self.right_forward_pin, 0)
+            self.set_motor_speed(self.left_reverse_pin, speed)
+            self.set_motor_speed(self.right_reverse_pin, speed)
+            print("Moving in reverse...")
 
     def stop(self):
         self.set_motor_speed(self.left_forward_pin, 0)
@@ -157,18 +159,20 @@ class Robot:
         print("stop")
 
     def clockwise(self, speed):
-        self.set_motor_speed(self.left_forward_pin, speed)
-        self.set_motor_speed(self.right_forward_pin, 0)
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, speed)
-        print("Moving clockwise...")
+        while self.state == States.CLOCKWISE:
+            self.set_motor_speed(self.left_forward_pin, speed)
+            self.set_motor_speed(self.right_forward_pin, 0)
+            self.set_motor_speed(self.left_reverse_pin, 0)
+            self.set_motor_speed(self.right_reverse_pin, speed)
+            print("Moving clockwise...")
 
     def counter_clockwise(self, speed):
-        self.set_motor_speed(self.left_forward_pin, 0)
-        self.set_motor_speed(self.right_forward_pin, speed)
-        self.set_motor_speed(self.left_reverse_pin, speed)
-        self.set_motor_speed(self.right_reverse_pin, 0)
-        print("Moving counter clockwise...")
+        while self.state == States.COUNTER_CLOCKWISE:
+            self.set_motor_speed(self.left_forward_pin, 0)
+            self.set_motor_speed(self.right_forward_pin, speed)
+            self.set_motor_speed(self.left_reverse_pin, speed)
+            self.set_motor_speed(self.right_reverse_pin, 0)
+            print("Moving counter clockwise...")
 
 
     '''
@@ -293,6 +297,7 @@ class Robot:
 '''
     robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
 '''
+@staticmethod
 def robot_controller_gui(robot):
     # Create the main window
     root = tk.Tk()
@@ -327,6 +332,7 @@ def robot_controller_gui(robot):
     # Start the Tkinter main loop
     root.mainloop()
 
+@staticmethod
 def robot_controller_keyboard(robot):
     while True:
         if keyboard.is_pressed('up'):
@@ -339,6 +345,10 @@ def robot_controller_keyboard(robot):
             robot.set_state(States.TURNING_RIGHT)
         else:
             robot.set_state(States.IDLE)
+
+@staticmethod
+def robot_controller_bluetooth(robot):
+    pass
 
 
 if __name__ == "__main__":
