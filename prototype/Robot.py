@@ -43,7 +43,8 @@ class Robot:
 
         # Initialize the Kalman filter
         self.sensorfusion = kalman.Kalman()
-        self.state = States.IDLE
+        self.state = States.IDLE # This variable is only to be changed and accessed by set_state() 
+        self.speed = 50 # This variable is only to be changed and accessed by set_speed() and handle_state_change()
 
         self.state_queue = []
 
@@ -73,6 +74,9 @@ class Robot:
     # This should replace the move_forward() once it has been tested
     def cruise_control(self, speed): 
         time.sleep(3)
+
+        speed = min(80, speed)
+
         target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
 
         self.set_motor_speed(self.left_reverse_pin, 0)
@@ -237,31 +241,81 @@ class Robot:
 
             time.sleep(.1) #5Hz
             
-
-    # set_state() should be the only way to change the direction of the robot.
-    # Later, have it update the state_queue instead of just setting the state
-    def set_state(self, state):
+    def set_state(self, new_state, speed=None):
         # Ensure the state is valid
-        if state in States:
-            self.state = state
+        if new_state in States:
+            if speed is not None:
+                self.speed = max(0, min(100, speed))
+            self.state = new_state
         else:
             raise Exception("Invalid state!")
+            
 
-    '''
-        start_movement_controller() is a function that should continuously run in the background and check the state of the robot.
-        It should call the appropriate function to move the robot based on the state. Later, it will also manage state_queue    
-    '''
+    # start_movement_controller() is a function that handles incoming bluetooth requests, continuously checks the state of the robot, and performs the appropriate action based on the state.
     def start_movement_controller(self):
         current_state = self.state  # Get the initial state
 
+        import serial
+        import time
+
+        port = 'COM5'
+        baud = 9600
+
+        ser = serial.Serial(port, baud, timeout=0.5)
+        print("Connected to: " + ser.portstr)
+        
+        data = []
+
         while True:
+            new_state = None
+            new_speed = None
+
+            # Check for incoming bluetooth requests
+            try:
+                if ser.in_waiting > 0:
+                    data.append(ser.read(1).decode('utf-8'))
+                    print("Found New Data", data)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                # Close the serial port
+                ser.close()
+
+            d0 = data[0]
+            if d0.isdigit():
+                d0 = int(d0)
+                if d0 > 0 and d0 < 10:
+                    command_to_state = {
+                        1: States.CRUISE,
+                        2: States.FORWARD,
+                        3: States.REVERSE,
+                        4: States.TURNING_LEFT,
+                        5: States.TURNING_RIGHT,
+                        6: States.CLOCKWISE,
+                        7: States.COUNTER_CLOCKWISE,
+                        8: States.IDLE,
+                        9: States.IDLE
+                    }
+                    new_state = command_to_state.get(d0)
+                    data.pop(0)
+                elif d0 >= 10 and d0 <= 100: 
+                    new_speed = int(d0)
+                    data.pop(0)
+                else: 
+                    data.pop(0)
+            else: # OK+CONN or OK+LOST
+                data = []
+                new_state = States.IDLE
+                
+            self.set_state(new_state, new_speed)
+
             if current_state != self.state:
                 # State has changed, handle it here
                 current_state = self.state  # Update the current state
-                if self.state == States.MOVING_FORWARD:
-                    self.move_forward(speed=50) #self.cruise_control(speed=50)
-                elif self.state == States.MOVING_BACKWARD:
-                    self.move_reverse(speed=50)
+                if self.state == States.FORWARD:
+                    self.move_forward(speed=self.speed)
+                elif self.state == States.REVERSE:
+                    self.move_reverse(speed=self.speed)
                 elif self.state == States.TURNING_LEFT:
                     self.turn_left(degrees=90)
                 elif self.state == States.TURNING_RIGHT:
@@ -269,13 +323,14 @@ class Robot:
                 elif self.state == States.IDLE:
                     self.stop()
                 elif self.state == States.CLOCKWISE:
-                    self.clockwise(speed=50)
+                    self.clockwise(speed=self.speed)
                 elif self.state == States.COUNTER_CLOCKWISE:
-                    self.counter_clockwise(speed=50)
+                    self.counter_clockwise(speed=self.speed)
                 elif self.state == States.CRUISE:
-                    self.cruise_control(speed=50)
+                    self.cruise_control(speed=self.speed)
                 else:
                     raise Exception("Invalid state!")
+
                 
     def start_ultrasound(self):
         GPIO.setmode(GPIO.BOARD)
@@ -345,10 +400,6 @@ def robot_controller_keyboard(robot):
             robot.set_state(States.TURNING_RIGHT)
         else:
             robot.set_state(States.IDLE)
-
-@staticmethod
-def robot_controller_bluetooth(robot):
-    pass
 
 
 if __name__ == "__main__":

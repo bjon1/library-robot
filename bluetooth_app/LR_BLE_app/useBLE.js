@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react'
 import { PermissionsAndroid, Platform } from 'react-native'
 import DeviceInfo from 'react-native-device-info';
+import { atoa, btoa } from 'react-native-quick-base64'
 import {
     BleError,
     BleManager,
@@ -10,8 +11,8 @@ import {
   } from "react-native-ble-plx";
 
 const BLE_NAME = 'DUMMY_NAME'
-const BLE_SERVICE_UUID = '00001101-0000-1000-8000-00805F9B34FB' //dummy UUID
-const BLE_SERVICE_CHARACTERISTIC = '0000ffe1-0000-1000-8000-00805f9b34fb' //dummy characteristic    
+const BLE_SERVICE_UUID = 'FFE0' //dummy UUID
+const BLE_SERVICE_CHARACTERISTIC = 'FFE1'//dummy characteristic    
 
 //BluetoothAPI:
 //requestPermissions(): Promise<boolean>
@@ -87,13 +88,13 @@ const useBLE = () => {
     }
 
     const scanForDevices = () => {
-        bleManager.startDeviceScan(null, null, (error, device) => {
+        bleManager.startDeviceScan( null , { legacyScan:false } , (error, device) => {
             if(error) {
                 console.log(error)
             }
 
             if(device && !isDuplicate(allDevices, device)) { // if we found a unique device, add it to the list of devices
-                setAllDevices(prevState => {
+                setAllDevices(prevState => { 
                     if(!isDuplicate(prevState, device)) {
                         return [...prevState, device]
                     } else {
@@ -123,11 +124,13 @@ const useBLE = () => {
         }
     }
 
+    /*
+
     const onUpdate = (error, characteristic) => {
         // handle the data from the characteristic
         //atob(characteristic.value)
         pass
-    }
+*/
 
     const startListening = async (device) => {
         if (device) {
@@ -141,10 +144,11 @@ const useBLE = () => {
         }
     }
 
+
     const sendCommand = async (device, command) => {
         try {
             if(connectedDevice) {
-                await bleManager.writeCharacteristicWithResponseForService(
+                await bleManager.writeCharacteristicWithResponseForDevice(
                     device.id,
                     BLE_SERVICE_UUID,
                     BLE_SERVICE_CHARACTERISTIC,

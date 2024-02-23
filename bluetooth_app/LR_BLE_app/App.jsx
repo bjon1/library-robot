@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, Button, TouchableOpacity, Touchable, DevSettings } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, ScrollView, View, Button, TouchableOpacity, Touchable, DevSettings } from 'react-native';
 import DeviceModal from './components/DeviceModal';
 import useBLE from './useBLE';
 import robotAPI from './services/robotAPI';
@@ -36,17 +36,19 @@ const App = () => {
   }
   
   const buttonData = [
-    { title: 'Cruise', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'cruise')) },
-    { title: 'Go Forward', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'forward')) },
-    { title: 'Go Backward', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'reverse')) },
-    { title: 'Turn Left', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'left')) },
-    { title: 'Turn Right', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'right')) },
-    { title: 'Stop', onPress: () => DeviceCommunicator(sendCommand(DeviceCommunicator.connectedDevice, 'stop'))},
+    
+    { title: 'Cruise', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 1) },
+    { title: 'Go Forward', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 2) },
+    { title: 'Go Backward', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 3) },
+    { title: 'Turn Left', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 4) },
+    { title: 'Turn Right', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 5) },
+    { title: 'Stop', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 6)},
     { title: 'reload', onPress: () => DevSettings.reload() },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView>
       <View>
         {DeviceCommunicator.connectedDevice && buttonData.map((button, index) => (
           <TouchableOpacity 
@@ -59,16 +61,21 @@ const App = () => {
         ))}
 
         {!DeviceCommunicator.connectedDevice && DeviceCommunicator.allDevices
-          .filter(device => device.name && device.name.trim() !== '') // Filter out devices with empty names
+          .filter(device => device.rssi > -70)
+          .sort((a, b) => b.rssi - a.rssi)
           .map((device, index) => (
             <TouchableOpacity
               style={styles.button}
               key={device.id}
               onPress={() => DeviceCommunicator.connectToDevice(device)}
             >
-              <Text>{device.name}</Text>
+              <Text>{device.name ? device.name : "Unknown"}</Text>
+              <Text>{device.id}</Text>
+              <Text>{device.rssi}</Text>
             </TouchableOpacity>
         ))}
+
+        <Text>{DeviceCommunicator.allDevices.length}</Text>
         
         <TouchableOpacity
           onPress={ DeviceCommunicator.connectedDevice ? DeviceCommunicator.disconnectFromDevice : pressConnect } 
@@ -78,10 +85,11 @@ const App = () => {
           </Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
 
     </SafeAreaView>
-  );
+  )
 }
 
 export default App
@@ -95,8 +103,8 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#007bff',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 50,
     borderRadius: 8,
     marginBottom: 10,
   },
