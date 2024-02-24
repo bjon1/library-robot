@@ -43,7 +43,8 @@ class Robot:
 
         # Initialize the Kalman filter
         self.sensorfusion = kalman.Kalman()
-        self.state = States.IDLE
+        self.state = States.IDLE # This variable is only to be changed and accessed by set_state() 
+        self.speed = 50 # This variable is only to be changed and accessed by set_speed() and handle_state_change()
 
         self.state_queue = []
 
@@ -72,8 +73,9 @@ class Robot:
 
     # This should replace the move_forward() once it has been tested
     def cruise_control(self, speed): 
-        time.sleep(3)
-        target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
+        time.sleep(1)
+        target_yaw = self.get_yaw() # Get the current yaw
+        speed = min(80, speed) # Ensure the speed is within the valid range (0 to 100)
 
         self.set_motor_speed(self.left_reverse_pin, 0)
         self.set_motor_speed(self.right_reverse_pin, 0)
@@ -83,7 +85,7 @@ class Robot:
 
         pid_controller = PIDController(kp=10.0, ki=0.10, kd=0.10, max_out=100-speed) # values of kp, ki, and kd will need tuning
 
-        while self.state == States.CRUISE:
+        while(self.state == States.CRUISE):
             current_yaw = self.get_yaw()
             error = target_yaw - current_yaw
             print("Target", target_yaw)
@@ -109,7 +111,7 @@ class Robot:
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2 # Error in degrees
-        while abs(yaw_left) < error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
+        while abs(yaw_left) > error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
@@ -124,7 +126,7 @@ class Robot:
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2
-        while abs(yaw_left) < error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
+        while abs(yaw_left) > error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
 
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
@@ -136,18 +138,20 @@ class Robot:
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, 0)
-        self.set_motor_speed(self.left_forward_pin, speed)
-        self.set_motor_speed(self.right_forward_pin, speed)
-        print("Moving forward")
+        if self.state == States.FORWARD:
+            self.set_motor_speed(self.left_reverse_pin, 0)
+            self.set_motor_speed(self.right_reverse_pin, 0)
+            self.set_motor_speed(self.left_forward_pin, speed)
+            self.set_motor_speed(self.right_forward_pin, speed)
+            print("Moving forward")
 
     def move_reverse(self, speed):
-        self.set_motor_speed(self.left_forward_pin, 0)
-        self.set_motor_speed(self.right_forward_pin, 0)
-        self.set_motor_speed(self.left_reverse_pin, speed)
-        self.set_motor_speed(self.right_reverse_pin, speed)
-        print("Moving in reverse...")
+        if self.state == States.REVERSE:
+            self.set_motor_speed(self.left_forward_pin, 0)
+            self.set_motor_speed(self.right_forward_pin, 0)
+            self.set_motor_speed(self.left_reverse_pin, speed)
+            self.set_motor_speed(self.right_reverse_pin, speed)
+            print("Moving in reverse...")
 
     def stop(self):
         self.set_motor_speed(self.left_forward_pin, 0)
@@ -157,18 +161,20 @@ class Robot:
         print("stop")
 
     def clockwise(self, speed):
-        self.set_motor_speed(self.left_forward_pin, speed)
-        self.set_motor_speed(self.right_forward_pin, 0)
-        self.set_motor_speed(self.left_reverse_pin, 0)
-        self.set_motor_speed(self.right_reverse_pin, speed)
-        print("Moving clockwise...")
+        if self.state == States.CLOCKWISE or self.state == States.TURNING_RIGHT:
+            self.set_motor_speed(self.left_forward_pin, 0)
+            self.set_motor_speed(self.right_forward_pin, speed)
+            self.set_motor_speed(self.left_reverse_pin, speed)
+            self.set_motor_speed(self.right_reverse_pin, 0)
+            print("Moving clockwise...")
 
     def counter_clockwise(self, speed):
-        self.set_motor_speed(self.left_forward_pin, 0)
-        self.set_motor_speed(self.right_forward_pin, speed)
-        self.set_motor_speed(self.left_reverse_pin, speed)
-        self.set_motor_speed(self.right_reverse_pin, 0)
-        print("Moving counter clockwise...")
+        if self.state == States.COUNTER_CLOCKWISE or self.state == States.TURNING_LEFT:
+            self.set_motor_speed(self.left_forward_pin, speed)
+            self.set_motor_speed(self.right_forward_pin, 0)
+            self.set_motor_speed(self.left_reverse_pin, 0)
+            self.set_motor_speed(self.right_reverse_pin, speed)
+            print("Moving counter clockwise...")
 
 
     '''
@@ -233,31 +239,30 @@ class Robot:
 
             time.sleep(.1) #5Hz
             
-
-    # set_state() should be the only way to change the direction of the robot.
-    # Later, have it update the state_queue instead of just setting the state
-    def set_state(self, state):
+    def set_state(self, new_state, speed=None):
         # Ensure the state is valid
-        if state in States:
-            self.state = state
+        if new_state in States:
+            if speed is not None:
+                self.speed = max(0, min(100, speed))
+            self.state = new_state
         else:
             raise Exception("Invalid state!")
+            
 
-    '''
-        start_movement_controller() is a function that should continuously run in the background and check the state of the robot.
-        It should call the appropriate function to move the robot based on the state. Later, it will also manage state_queue    
-    '''
+    # start_movement_controller() is a function that handles incoming bluetooth requests, continuously checks the state of the robot, and performs the appropriate action based on the state.
     def start_movement_controller(self):
         current_state = self.state  # Get the initial state
-
         while True:
-            if current_state != self.state:
+            if(current_state != self.state):
+                self.stop()
+                time.sleep(0.05)
                 # State has changed, handle it here
                 current_state = self.state  # Update the current state
-                if self.state == States.MOVING_FORWARD:
-                    self.move_forward(speed=50) #self.cruise_control(speed=50)
-                elif self.state == States.MOVING_BACKWARD:
-                    self.move_reverse(speed=50)
+
+                if self.state == States.FORWARD:
+                    self.move_forward(speed=self.speed)
+                elif self.state == States.REVERSE:
+                    self.move_reverse(speed=self.speed)
                 elif self.state == States.TURNING_LEFT:
                     self.turn_left(degrees=90)
                 elif self.state == States.TURNING_RIGHT:
@@ -265,11 +270,11 @@ class Robot:
                 elif self.state == States.IDLE:
                     self.stop()
                 elif self.state == States.CLOCKWISE:
-                    self.clockwise(speed=50)
+                    self.clockwise(speed=self.speed)
                 elif self.state == States.COUNTER_CLOCKWISE:
-                    self.counter_clockwise(speed=50)
+                    self.counter_clockwise(speed=self.speed)
                 elif self.state == States.CRUISE:
-                    self.cruise_control(speed=50)
+                    self.cruise_control(speed=self.speed)
                 else:
                     raise Exception("Invalid state!")
                 
@@ -289,10 +294,64 @@ class Robot:
     def start_object_detection(self):
         #TODO: Implement object detection
         pass
+
+
+    def handle_incoming_data(self):
+        import serial
+        port = '/dev/ttyTHS1'
+        baud = 9600
+
+        ser = serial.Serial(port, baud, timeout=0.5)
+
+        print("Connected to: " + ser.portstr)
+
+        try:
+            while True:
+                data = None
+                new_state = None
+                new_speed = None
+
+                # Check for incoming bluetooth requests
+                if ser.in_waiting > 0:
+                    data = ser.read(ser.in_waiting).decode('utf-8')
+                    print("Found New Data", data)
+
+                if data and data.isdigit():
+                    data = int(data)
+                    if data > 0 and data < 10:
+                        command_to_state = {
+                            1: States.CRUISE,
+                            2: States.FORWARD,
+                            3: States.REVERSE,
+                            4: States.TURNING_LEFT,
+                            5: States.TURNING_RIGHT,
+                            6: States.CLOCKWISE,
+                            7: States.COUNTER_CLOCKWISE,
+                            8: States.IDLE,
+                            9: States.IDLE
+                        }
+                        new_state = command_to_state.get(data)
+                    elif data >= 10 and data <= 100: 
+                        new_speed = int(data)
+                elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
+                    new_state = States.IDLE
+                
+                if new_state is None:
+                    new_state = self.state
+                if new_speed is None:
+                    new_speed = self.speed
+                self.set_state(new_state, new_speed)
+                print("STATE", self.state)
+                time.sleep(0.20)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            ser.close()
                 
 '''
     robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
 '''
+@staticmethod
 def robot_controller_gui(robot):
     # Create the main window
     root = tk.Tk()
@@ -306,8 +365,8 @@ def robot_controller_gui(robot):
     # Note: The lambda function is used to pass a parameter to the function called by the button
 
     button_cruise = tk.Button(button_frame, text="Cruise", command=lambda: robot.set_state(States.CRUISE))
-    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.MOVING_FORWARD))
-    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
+    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.FORWARD))
+    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.REVERSE))
     button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
     button_right= tk.Button(button_frame, text="Right", command=lambda: robot.set_state(States.TURNING_RIGHT))
     button_clockwise= tk.Button(button_frame, text="Clockwise", command=lambda: robot.set_state(States.CLOCKWISE))
@@ -327,12 +386,13 @@ def robot_controller_gui(robot):
     # Start the Tkinter main loop
     root.mainloop()
 
+@staticmethod
 def robot_controller_keyboard(robot):
     while True:
         if keyboard.is_pressed('up'):
-            robot.set_state(States.MOVING_FORWARD)
+            robot.set_state(States.FORWARD)
         elif keyboard.is_pressed('down'):
-            robot.set_state(States.MOVING_BACKWARD)
+            robot.set_state(States.REVERSE)
         elif keyboard.is_pressed('left'):
             robot.set_state(States.TURNING_LEFT)
         elif keyboard.is_pressed('right'):
@@ -341,17 +401,21 @@ def robot_controller_keyboard(robot):
             robot.set_state(States.IDLE)
 
 
+
+
+
 if __name__ == "__main__":
     robot = Robot(pwm_frequency=50)
     
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
-    t3 = Thread(target=lambda: robot_controller_gui(robot))
+    t3 = Thread(target=robot.handle_incoming_data)
     t1.start()
     print("got here")
     t2.start()
     print("got here")
     t3.start()
+    print("got here")
     
 
     '''
@@ -364,9 +428,6 @@ if __name__ == "__main__":
     print("got here")
     p3.start()
     '''
-
-    #robot.set_state(States.MOVING_FORWARD)
-    print("got here2")
 
 
     ''' Overall sequence; to be replaced by Process class
