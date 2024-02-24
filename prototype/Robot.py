@@ -111,7 +111,7 @@ class Robot:
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2 # Error in degrees
-        while abs(yaw_left) < error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
+        while abs(yaw_left) > error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
@@ -126,7 +126,7 @@ class Robot:
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2
-        while abs(yaw_left) < error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
+        while abs(yaw_left) > error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
 
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
@@ -161,19 +161,19 @@ class Robot:
         print("stop")
 
     def clockwise(self, speed):
-        if self.state == States.CLOCKWISE:
-            self.set_motor_speed(self.left_forward_pin, speed)
-            self.set_motor_speed(self.right_forward_pin, 0)
-            self.set_motor_speed(self.left_reverse_pin, 0)
-            self.set_motor_speed(self.right_reverse_pin, speed)
-            print("Moving clockwise...")
-
-    def counter_clockwise(self, speed):
-        if self.state == States.COUNTER_CLOCKWISE:
+        if self.state == States.CLOCKWISE or self.state == States.TURNING_RIGHT:
             self.set_motor_speed(self.left_forward_pin, 0)
             self.set_motor_speed(self.right_forward_pin, speed)
             self.set_motor_speed(self.left_reverse_pin, speed)
             self.set_motor_speed(self.right_reverse_pin, 0)
+            print("Moving clockwise...")
+
+    def counter_clockwise(self, speed):
+        if self.state == States.COUNTER_CLOCKWISE or self.state == States.TURNING_LEFT:
+            self.set_motor_speed(self.left_forward_pin, speed)
+            self.set_motor_speed(self.right_forward_pin, 0)
+            self.set_motor_speed(self.left_reverse_pin, 0)
+            self.set_motor_speed(self.right_reverse_pin, speed)
             print("Moving counter clockwise...")
 
 
@@ -252,7 +252,51 @@ class Robot:
     # start_movement_controller() is a function that handles incoming bluetooth requests, continuously checks the state of the robot, and performs the appropriate action based on the state.
     def start_movement_controller(self):
         current_state = self.state  # Get the initial state
+        while True:
+            if(current_state != self.state):
+                self.stop()
+                time.sleep(0.05)
+                # State has changed, handle it here
+                current_state = self.state  # Update the current state
 
+                if self.state == States.FORWARD:
+                    self.move_forward(speed=self.speed)
+                elif self.state == States.REVERSE:
+                    self.move_reverse(speed=self.speed)
+                elif self.state == States.TURNING_LEFT:
+                    self.turn_left(degrees=90)
+                elif self.state == States.TURNING_RIGHT:
+                    self.turn_right(degrees=90)
+                elif self.state == States.IDLE:
+                    self.stop()
+                elif self.state == States.CLOCKWISE:
+                    self.clockwise(speed=self.speed)
+                elif self.state == States.COUNTER_CLOCKWISE:
+                    self.counter_clockwise(speed=self.speed)
+                elif self.state == States.CRUISE:
+                    self.cruise_control(speed=self.speed)
+                else:
+                    raise Exception("Invalid state!")
+                
+    def start_ultrasound(self):
+        GPIO.setmode(GPIO.BOARD)
+
+        usensor1 = USensor(name="front1", trig=16, echo=18)
+        usensor2 = USensor(name="front2", trig=19, echo=21)
+        usensor3 = USensor(name="side1", trig=23, echo=24)
+        usensor4 = USensor(name="side2", trig=26, echo=22)
+
+        while True:
+            if(usensor1.send_ultrasound() or usensor2.send_ultrasound() or usensor3.send_ultrasound() or usensor4.send_ultrasound()):
+                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter        
+            time.sleep(0.5)
+
+    def start_object_detection(self):
+        #TODO: Implement object detection
+        pass
+
+
+    def handle_incoming_data(self):
         import serial
         port = '/dev/ttyTHS1'
         baud = 9600
@@ -297,52 +341,12 @@ class Robot:
                 if new_speed is None:
                     new_speed = self.speed
                 self.set_state(new_state, new_speed)
+                print("STATE", self.state)
                 time.sleep(0.20)
-
-                if current_state != self.state:
-                    # State has changed, handle it here
-                    current_state = self.state  # Update the current state
-                    if self.state == States.FORWARD:
-                        self.move_forward(speed=self.speed)
-                    elif self.state == States.REVERSE:
-                        self.move_reverse(speed=self.speed)
-                    elif self.state == States.TURNING_LEFT:
-                        self.turn_left(degrees=90)
-                    elif self.state == States.TURNING_RIGHT:
-                        self.turn_right(degrees=90)
-                    elif self.state == States.IDLE:
-                        self.stop()
-                    elif self.state == States.CLOCKWISE:
-                        self.clockwise(speed=self.speed)
-                    elif self.state == States.COUNTER_CLOCKWISE:
-                        self.counter_clockwise(speed=self.speed)
-                    elif self.state == States.CRUISE:
-                        self.cruise_control(speed=self.speed)
-                    else:
-                        raise Exception("Invalid state!")
-                
         except KeyboardInterrupt:
             pass
-        finally:    
+        finally:
             ser.close()
-            print("Serial port closed")
-                
-    def start_ultrasound(self):
-        GPIO.setmode(GPIO.BOARD)
-
-        usensor1 = USensor(name="front1", trig=16, echo=18)
-        usensor2 = USensor(name="front2", trig=19, echo=21)
-        usensor3 = USensor(name="side1", trig=23, echo=24)
-        usensor4 = USensor(name="side2", trig=26, echo=22)
-
-        while True:
-            if(usensor1.send_ultrasound() or usensor2.send_ultrasound() or usensor3.send_ultrasound() or usensor4.send_ultrasound()):
-                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter        
-            time.sleep(0.5)
-
-    def start_object_detection(self):
-        #TODO: Implement object detection
-        pass
                 
 '''
     robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
@@ -397,14 +401,20 @@ def robot_controller_keyboard(robot):
             robot.set_state(States.IDLE)
 
 
+
+
+
 if __name__ == "__main__":
     robot = Robot(pwm_frequency=50)
     
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
+    t3 = Thread(target=robot.handle_incoming_data)
     t1.start()
     print("got here")
     t2.start()
+    print("got here")
+    t3.start()
     print("got here")
     
 
