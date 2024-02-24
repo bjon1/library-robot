@@ -1,16 +1,18 @@
-import { useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, ScrollView, View, Button, TouchableOpacity, Touchable, DevSettings } from 'react-native';
+import { useState, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, Text, ScrollView, View, Button, TouchableOpacity, Touchable, DevSettings } from 'react-native'
+
 import DeviceModal from './components/DeviceModal';
 import useBLE from './useBLE';
 import robotAPI from './services/robotAPI';
 import { Device } from 'react-native-ble-plx';
+import { responsive } from './utils/responsive';
 
 const App = () => {
 
-  const DeviceCommunicator = useBLE()
+  const { requestPermissions, scanAndConnect, connectToDevice, disconnectFromDevice, sendCommand, connectedDevice, allDevices } = useBLE()
     /* Device Communicator:
         requestPermissions() -> boolean
-        scanForDevices() 
+        scanAndConnect() 
         connectToDevice(device) //updates connectedDevice
         disconnectFromDevice() //updates connectedDevice
         startListening(device)
@@ -18,16 +20,18 @@ const App = () => {
         connectedDevice 
         allDevices
     */
-  
 
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [sliderValue, setSliderValue] = useState(0);
+
+  const onSliderValueChange = (value) => {
+    setSliderValue(value);
+  };
 
   const pressConnect = async () => {
     try {
-      const acceptedPermissions = await DeviceCommunicator.requestPermissions();
+      const acceptedPermissions = await requestPermissions();
       if(acceptedPermissions) {
-        DeviceCommunicator.scanForDevices();
-        alert('Scanning for devices');
+        scanAndConnect();
       }
     } catch (error) {
       // Handle any errors that occurred during permission request
@@ -36,98 +40,112 @@ const App = () => {
   }
   
   const buttonData = [
+    { title: 'Left 90', onPress: () => sendCommand(connectedDevice, 4) },
+    { title: 'Forward', onPress: () => sendCommand(connectedDevice, 2) },
+    { title: 'Right 90', onPress: () => sendCommand(connectedDevice, 5) },
     
-    { title: 'Cruise', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 1) },
-    { title: 'Go Forward', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 2) },
-    { title: 'Go Backward', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 3) },
-    { title: 'Turn Left', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 4) },
-    { title: 'Turn Right', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 5) },
-    { title: 'Stop', onPress: () => DeviceCommunicator.sendCommand(DeviceCommunicator.connectedDevice, 6)},
-    { title: 'reload', onPress: () => DevSettings.reload() },
+    { title: 'CCW', onPress: () => sendCommand(connectedDevice, 7) },
+    { title: 'STOP', onPress: () => sendCommand(connectedDevice, 8) },
+    { title: 'CW', onPress: () => sendCommand(connectedDevice, 6) },
+
+    { title: 'Reverse', onPress: () => sendCommand(connectedDevice, 3) },
+
+    { title: 'Cruise', onPress: () => sendCommand(connectedDevice, 1) },
+    { title: 'STOP', onPress: () => sendCommand(connectedDevice, 9) }
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-      <View>
-        {DeviceCommunicator.connectedDevice && buttonData.map((button, index) => (
-          <TouchableOpacity 
-            key={index}
-            style={styles.button}
-            onPress={button.onPress}
-          >
-            <Text style={styles.buttonText}>{button.title}</Text>
-          </TouchableOpacity>
-        ))}
-
-        {!DeviceCommunicator.connectedDevice && DeviceCommunicator.allDevices
-          .filter(device => device.rssi > -70)
-          .sort((a, b) => b.rssi - a.rssi)
-          .map((device, index) => (
-            <TouchableOpacity
-              style={styles.button}
-              key={device.id}
-              onPress={() => DeviceCommunicator.connectToDevice(device)}
-            >
-              <Text>{device.name ? device.name : "Unknown"}</Text>
-              <Text>{device.id}</Text>
-              <Text>{device.rssi}</Text>
+    <SafeAreaView style={styles.appScreen}>
+      <View style={ styles.appContainer}>
+        <View style={styles.row}>
+          {buttonData.slice(0, 3).map((button, index) => (
+            <TouchableOpacity key={index} style={styles.button} onPress={button.onPress}>
+              <Text style={styles.buttonText}>{button.title}</Text>
             </TouchableOpacity>
-        ))}
+          ))}
+        </View>
+ 
+        <View style={styles.row}>
+          {buttonData.slice(3, 6).map((button, index) => (
+            <TouchableOpacity key={index} style={styles.button} onPress={button.onPress}>
+              <Text style={styles.buttonText}>{button.title}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <Text>{DeviceCommunicator.allDevices.length}</Text>
-        
+        <View style={styles.row}>
+          <TouchableOpacity 
+            style={[styles.button, styles.centeredButton]}
+            onPress={ () => sendCommand(connectedDevice, 3) }
+          >
+            <Text style={styles.buttonText}>Reverse</Text>
+          </TouchableOpacity>
+        </View>
+
+
+
+
+
         <TouchableOpacity
-          onPress={ DeviceCommunicator.connectedDevice ? DeviceCommunicator.disconnectFromDevice : pressConnect } 
-          style={ styles.ctaButton }>
-          <Text style={ styles.ctaButtonText }>
-            { DeviceCommunicator.connectedDevice ? 'Disconnect' : 'Connect' }
+          onPress={ connectedDevice ? disconnectFromDevice : pressConnect } 
+          style={ styles.Button }
+        >
+          <Text style={ styles.ButtonText }>
+            { connectedDevice ? 'Disconnect' : 'Connect' }
           </Text>
         </TouchableOpacity>
+
       </View>
-      </ScrollView>
-
-
     </SafeAreaView>
   )
 }
 
-export default App
+const orange = '#F3721B'
+const blue = '#173A79'
+const white = '#FAF9F9'
 
 const styles = StyleSheet.create({
-  container: {
+  appScreen: {
     flex: 1,
-    backgroundColor: '#abe7ff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#FAF9F9',
+  },
+  appContainer: {
+    flex: 1,
+    justifyContent: 'center', // Center content vertically
+    alignItems: 'center', // Center content horizontally
+  },
+  row: {
+    flexDirection: 'row',
+    marginBottom: responsive(10), // Adjust spacing between rows
   },
   button: {
-    backgroundColor: '#007bff',
-    paddingVertical: 15,
-    paddingHorizontal: 50,
-    borderRadius: 8,
-    marginBottom: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    width: responsive(95),
+    paddingVertical: responsive(40),
+    paddingHorizontal: responsive(25),
+    margin: responsive(10),
   },
   buttonText: {
-    color: 'white',
-    fontSize: 20,
-    textAlign: 'center',
+    color: 'black',
   },
-  blackText: {
-    color: 'black'
+  centeredButton: {
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
-  ctaButton: {
+  Button: {
     backgroundColor: 'purple',
     justifyContent: 'center',
-    alignItems: 'center',
-    height: 50,
-    marginHorizontal: 20,
-    marginBottom: 5,
-    borderRadius: 8,
+    alignItems: 'flex-end',
+    paddingVertical: responsive(30),
+    paddingHorizontal: responsive(50),
+    borderRadius: responsive(100),
   },
-  ctaButtonText: {
-    fontSize: 18,
+  ButtonText: {
+    fontSize: responsive(25),
     fontWeight: 'bold',
     color: 'white',
   },
 });
+
+export default App

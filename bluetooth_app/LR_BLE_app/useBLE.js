@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import { PermissionsAndroid, Platform } from 'react-native'
 import DeviceInfo from 'react-native-device-info';
-import { atoa, btoa } from 'react-native-quick-base64'
+import { atob, btoa } from 'react-native-quick-base64'
 import {
     BleError,
     BleManager,
@@ -10,13 +10,8 @@ import {
     Device,
   } from "react-native-ble-plx";
 
-const BLE_NAME = 'DUMMY_NAME'
 const BLE_SERVICE_UUID = 'FFE0' //dummy UUID
 const BLE_SERVICE_CHARACTERISTIC = 'FFE1'//dummy characteristic    
-
-//BluetoothAPI:
-//requestPermissions(): Promise<boolean>
-//scanForPeripherals(): void
 
 const useBLE = () => {
 
@@ -81,26 +76,24 @@ const useBLE = () => {
             return true;
         }
     }
-    
-    // isDuplicate() checks if the new device is already in the list of devices
+
     const isDuplicate = (devices, newDevice) => {
         return devices.some(device => device.id === newDevice.id)
     }
 
-    const scanForDevices = () => {
+    const scanAndConnect = () => {
         bleManager.startDeviceScan( null , { legacyScan:false } , (error, device) => {
             if(error) {
                 console.log(error)
             }
 
-            if(device && !isDuplicate(allDevices, device)) { // if we found a unique device, add it to the list of devices
-                setAllDevices(prevState => { 
-                    if(!isDuplicate(prevState, device)) {
-                        return [...prevState, device]
-                    } else {
-                        return prevState
-                    }
-                })
+            if (
+                device &&
+                (device.name?.includes("HENRY") ||
+                  device.id == "68:5E:1C:5A:95:EE")
+            ) {
+                bleManager.stopDeviceScan()
+                connectToDevice(device)
             }
         })
     }
@@ -109,9 +102,9 @@ const useBLE = () => {
         try {
             const connectedDevice = await bleManager.connectToDevice(device.id)
             setConnectedDevice(connectedDevice)
+            alert("Connected to Henry!")
             await connectedDevice.discoverAllServicesAndCharacteristics()
-            bleManager.stopDeviceScan()
-            startListening(connectedDevice)
+            //startListening(connectedDevice)
         } catch(error) {
             console.error("Error in connection", error)
         }
@@ -119,20 +112,20 @@ const useBLE = () => {
 
     const disconnectFromDevice = async () => {
         if(connectedDevice) {
-            bleManager.cancelDeviceConnection(connectedDevice.id)
+            await bleManager.cancelDeviceConnection(connectedDevice.id)
             setConnectedDevice(null)
+            alert("Disconnected From Henry")
         }
     }
 
-    /*
 
     const onUpdate = (error, characteristic) => {
         // handle the data from the characteristic
         //atob(characteristic.value)
-        pass
-*/
+    }
 
     const startListening = async (device) => {
+        /*
         if (device) {
           device.monitorCharacteristicForService(
             BLE_SERVICE_UUID,
@@ -142,6 +135,7 @@ const useBLE = () => {
         } else {
           console.log('No Device Connected');
         }
+        */
     }
 
 
@@ -154,7 +148,7 @@ const useBLE = () => {
                     BLE_SERVICE_CHARACTERISTIC,
                     btoa(`${command}`)
                 )
-            }
+            } 
         } catch(error) {
             console.error("Error in sending command", error)
         }
@@ -163,7 +157,7 @@ const useBLE = () => {
     
     return {
         requestPermissions,
-        scanForDevices,
+        scanAndConnect,
         connectToDevice,
         disconnectFromDevice,
         startListening,
