@@ -1,7 +1,7 @@
 import serial
 import time
 
-port = 'COM5'
+port = "/dev/ttyTHS1"
 baud = 9600
 
 ser = serial.Serial(port, baud, timeout=0.5)
@@ -15,7 +15,7 @@ try:
     while True:
         if ser.in_waiting > 0:
             # Read the available bytes from the serial port
-            data.append(ser.read(ser.in_waiting).decode('utf-8'))
+            data = ser.read(ser.in_waiting)
             print(data)
 except KeyboardInterrupt:
     pass

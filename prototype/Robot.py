@@ -73,11 +73,9 @@ class Robot:
 
     # This should replace the move_forward() once it has been tested
     def cruise_control(self, speed): 
-        time.sleep(3)
-
-        speed = min(80, speed)
-
-        target_yaw = self.get_yaw()  # capture the yaw at the moment the robot started moving forward
+        time.sleep(1)
+        target_yaw = self.get_yaw() # Get the current yaw
+        speed = min(80, speed) # Ensure the speed is within the valid range (0 to 100)
 
         self.set_motor_speed(self.left_reverse_pin, 0)
         self.set_motor_speed(self.right_reverse_pin, 0)
@@ -87,7 +85,7 @@ class Robot:
 
         pid_controller = PIDController(kp=10.0, ki=0.10, kd=0.10, max_out=100-speed) # values of kp, ki, and kd will need tuning
 
-        while self.state == States.CRUISE:
+        while(self.state == States.CRUISE):
             current_yaw = self.get_yaw()
             error = target_yaw - current_yaw
             print("Target", target_yaw)
@@ -140,7 +138,7 @@ class Robot:
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
-        while self.state == States.MOVING_FORWARD:
+        if self.state == States.FORWARD:
             self.set_motor_speed(self.left_reverse_pin, 0)
             self.set_motor_speed(self.right_reverse_pin, 0)
             self.set_motor_speed(self.left_forward_pin, speed)
@@ -148,7 +146,7 @@ class Robot:
             print("Moving forward")
 
     def move_reverse(self, speed):
-        while self.state == States.MOVING_BACKWARD:
+        if self.state == States.REVERSE:
             self.set_motor_speed(self.left_forward_pin, 0)
             self.set_motor_speed(self.right_forward_pin, 0)
             self.set_motor_speed(self.left_reverse_pin, speed)
@@ -163,7 +161,7 @@ class Robot:
         print("stop")
 
     def clockwise(self, speed):
-        while self.state == States.CLOCKWISE:
+        if self.state == States.CLOCKWISE:
             self.set_motor_speed(self.left_forward_pin, speed)
             self.set_motor_speed(self.right_forward_pin, 0)
             self.set_motor_speed(self.left_reverse_pin, 0)
@@ -171,7 +169,7 @@ class Robot:
             print("Moving clockwise...")
 
     def counter_clockwise(self, speed):
-        while self.state == States.COUNTER_CLOCKWISE:
+        if self.state == States.COUNTER_CLOCKWISE:
             self.set_motor_speed(self.left_forward_pin, 0)
             self.set_motor_speed(self.right_forward_pin, speed)
             self.set_motor_speed(self.left_reverse_pin, speed)
@@ -256,81 +254,78 @@ class Robot:
         current_state = self.state  # Get the initial state
 
         import serial
-        import time
-
-        port = 'COM5'
+        port = '/dev/ttyTHS1'
         baud = 9600
 
         ser = serial.Serial(port, baud, timeout=0.5)
+
         print("Connected to: " + ser.portstr)
-        
-        data = []
 
-        while True:
-            new_state = None
-            new_speed = None
+        try:
+            while True:
+                data = None
+                new_state = None
+                new_speed = None
 
-            # Check for incoming bluetooth requests
-            try:
+                # Check for incoming bluetooth requests
                 if ser.in_waiting > 0:
-                    data.append(ser.read(1).decode('utf-8'))
+                    data = ser.read(ser.in_waiting).decode('utf-8')
                     print("Found New Data", data)
-            except KeyboardInterrupt:
-                pass
-            finally:
-                # Close the serial port
-                ser.close()
 
-            d0 = data[0]
-            if d0.isdigit():
-                d0 = int(d0)
-                if d0 > 0 and d0 < 10:
-                    command_to_state = {
-                        1: States.CRUISE,
-                        2: States.FORWARD,
-                        3: States.REVERSE,
-                        4: States.TURNING_LEFT,
-                        5: States.TURNING_RIGHT,
-                        6: States.CLOCKWISE,
-                        7: States.COUNTER_CLOCKWISE,
-                        8: States.IDLE,
-                        9: States.IDLE
-                    }
-                    new_state = command_to_state.get(d0)
-                    data.pop(0)
-                elif d0 >= 10 and d0 <= 100: 
-                    new_speed = int(d0)
-                    data.pop(0)
-                else: 
-                    data.pop(0)
-            else: # OK+CONN or OK+LOST
-                data = []
-                new_state = States.IDLE
+                if data and data.isdigit():
+                    data = int(data)
+                    if data > 0 and data < 10:
+                        command_to_state = {
+                            1: States.CRUISE,
+                            2: States.FORWARD,
+                            3: States.REVERSE,
+                            4: States.TURNING_LEFT,
+                            5: States.TURNING_RIGHT,
+                            6: States.CLOCKWISE,
+                            7: States.COUNTER_CLOCKWISE,
+                            8: States.IDLE,
+                            9: States.IDLE
+                        }
+                        new_state = command_to_state.get(data)
+                    elif data >= 10 and data <= 100: 
+                        new_speed = int(data)
+                elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
+                    new_state = States.IDLE
                 
-            self.set_state(new_state, new_speed)
+                if new_state is None:
+                    new_state = self.state
+                if new_speed is None:
+                    new_speed = self.speed
+                self.set_state(new_state, new_speed)
+                time.sleep(0.20)
 
-            if current_state != self.state:
-                # State has changed, handle it here
-                current_state = self.state  # Update the current state
-                if self.state == States.FORWARD:
-                    self.move_forward(speed=self.speed)
-                elif self.state == States.REVERSE:
-                    self.move_reverse(speed=self.speed)
-                elif self.state == States.TURNING_LEFT:
-                    self.turn_left(degrees=90)
-                elif self.state == States.TURNING_RIGHT:
-                    self.turn_right(degrees=90)
-                elif self.state == States.IDLE:
-                    self.stop()
-                elif self.state == States.CLOCKWISE:
-                    self.clockwise(speed=self.speed)
-                elif self.state == States.COUNTER_CLOCKWISE:
-                    self.counter_clockwise(speed=self.speed)
-                elif self.state == States.CRUISE:
-                    self.cruise_control(speed=self.speed)
-                else:
-                    raise Exception("Invalid state!")
-
+                if current_state != self.state:
+                    # State has changed, handle it here
+                    current_state = self.state  # Update the current state
+                    if self.state == States.FORWARD:
+                        self.move_forward(speed=self.speed)
+                    elif self.state == States.REVERSE:
+                        self.move_reverse(speed=self.speed)
+                    elif self.state == States.TURNING_LEFT:
+                        self.turn_left(degrees=90)
+                    elif self.state == States.TURNING_RIGHT:
+                        self.turn_right(degrees=90)
+                    elif self.state == States.IDLE:
+                        self.stop()
+                    elif self.state == States.CLOCKWISE:
+                        self.clockwise(speed=self.speed)
+                    elif self.state == States.COUNTER_CLOCKWISE:
+                        self.counter_clockwise(speed=self.speed)
+                    elif self.state == States.CRUISE:
+                        self.cruise_control(speed=self.speed)
+                    else:
+                        raise Exception("Invalid state!")
+                
+        except KeyboardInterrupt:
+            pass
+        finally:    
+            ser.close()
+            print("Serial port closed")
                 
     def start_ultrasound(self):
         GPIO.setmode(GPIO.BOARD)
@@ -366,8 +361,8 @@ def robot_controller_gui(robot):
     # Note: The lambda function is used to pass a parameter to the function called by the button
 
     button_cruise = tk.Button(button_frame, text="Cruise", command=lambda: robot.set_state(States.CRUISE))
-    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.MOVING_FORWARD))
-    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.MOVING_BACKWARD))
+    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.FORWARD))
+    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.REVERSE))
     button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
     button_right= tk.Button(button_frame, text="Right", command=lambda: robot.set_state(States.TURNING_RIGHT))
     button_clockwise= tk.Button(button_frame, text="Clockwise", command=lambda: robot.set_state(States.CLOCKWISE))
@@ -391,9 +386,9 @@ def robot_controller_gui(robot):
 def robot_controller_keyboard(robot):
     while True:
         if keyboard.is_pressed('up'):
-            robot.set_state(States.MOVING_FORWARD)
+            robot.set_state(States.FORWARD)
         elif keyboard.is_pressed('down'):
-            robot.set_state(States.MOVING_BACKWARD)
+            robot.set_state(States.REVERSE)
         elif keyboard.is_pressed('left'):
             robot.set_state(States.TURNING_LEFT)
         elif keyboard.is_pressed('right'):
@@ -407,12 +402,10 @@ if __name__ == "__main__":
     
     t1 = Thread(target=robot.start_movement_controller)
     t2 = Thread(target=robot.start_sensorfusion)
-    t3 = Thread(target=lambda: robot_controller_gui(robot))
     t1.start()
     print("got here")
     t2.start()
     print("got here")
-    t3.start()
     
 
     '''
@@ -425,9 +418,6 @@ if __name__ == "__main__":
     print("got here")
     p3.start()
     '''
-
-    #robot.set_state(States.MOVING_FORWARD)
-    print("got here2")
 
 
     ''' Overall sequence; to be replaced by Process class
