@@ -1,0 +1,18 @@
+{
+  "type": "module", 
+  "name": "surface_pro_web_interface",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm i -ws && npm run build -ws",
+    "start": "npm i -ws && npm run build -ws && node server/index.js",
+    "dev": "nodemon server/index.js --watch server"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "workspaces": [
+    "client"
+  ]
+}
