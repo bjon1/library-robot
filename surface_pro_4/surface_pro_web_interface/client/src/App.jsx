@@ -1,35 +1,59 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+import { useRoutes } from 'react-router-dom'
+import Header from './components/Header.jsx'
+import Footer from './components/Footer.jsx'
 
-  return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+import MainMenu from './MainMenu.jsx'
+import Movement from './components/Movement.jsx'
+import Diagnostics from './components/Diagnostics.jsx'
+import Faces from './components/Faces.jsx'
+import ViewCameras from './components/ViewCameras.jsx'
+import Admin from './components/Admin.jsx'
+import NotFound from './components/NotFound.jsx'
+
+const App = () => {
+
+   let element = useRoutes([
+      {
+         path: '/',
+         element: <MainMenu />
+      },
+      {
+         path: '/movement',
+         element: <Movement />
+      },
+      {
+         path: '/diagnostics',
+         element: <Diagnostics />
+      },
+      {
+         path: '/faces',
+         element: <Faces />
+      },
+      {
+         path: '/viewcameras',
+         element: <ViewCameras />
+      },
+      {
+         path: '/admin',
+         element: <Admin />
+      },
+      { 
+         path: '*', 
+         element: <NotFound />
+      }
+   ])
+
+   return(
+      <div className = "App container">
+         <Header/>
+            <div className="App__center">
+               {element}
+            </div>
+         <Footer/>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+   );
 }
 
 export default App
