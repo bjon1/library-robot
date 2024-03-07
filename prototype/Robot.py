@@ -4,16 +4,13 @@ import board
 import busio
 import Jetson.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
-import numpy as np
-import tkinter as tk
-from imusensor.filters import kalman 
 from mpu9250_i2c import *
+from SensorFusion import Orientation
 from PIDController import PIDController
 from USensor import USensor
 from States import States
 from threading import Thread
 from multiprocessing import Process
-import csv
 
 class Robot:
 
@@ -24,7 +21,7 @@ class Robot:
 
 
         # Initialize PCA9685 object with I2C
-        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) #27, 28
+        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) #28, 27
         self.pca.frequency = pwm_frequency  # Set PWM frequency to 50 Hz
         
         # Define the PWM channels for the robot's motors      
@@ -41,27 +38,27 @@ class Robot:
         self.right_reverse_pin = pins.get("right_reverse")
 
         # Initialize the Kalman filter
-        self.sensorfusion = kalman.Kalman()
+        self.orientation = Orientation()
         self.state = States.IDLE # This variable is only to be changed and accessed by set_state() 
         self.speed = 50 # This variable is only to be changed and accessed by set_speed() and handle_state_change()
 
         self.state_queue = []
 
     def get_yaw(self):
-        if self.sensorfusion.yaw == 0 and self.sensorfusion.roll == 0 and self.sensorfusion.pitch == 0:
+        if self.orientation.yaw == 0 and self.orientation.roll == 0 and self.orientation.pitch == 0:
             raise Exception("Sensor fusion has not been started. Call start_sensorfusion() first.")
-        print(self.sensorfusion.yaw)
-        return self.sensorfusion.yaw
+        print(self.orientation.yaw)
+        return self.orientation.yaw
     
     def get_pitch(self):
-        if self.sensorfusion.yaw == 0 and self.sensorfusion.roll == 0 and self.sensorfusion.pitch == 0:
+        if self.orientation.yaw == 0 and self.orientation.roll == 0 and self.orientation.pitch == 0:
             raise Exception("Sensor fusion has not been started. Call start_sensorfusion() first.")
-        return self.sensorfusion.pitch
+        return self.orientation.pitch
 
     def get_roll(self):
-        if self.sensorfusion.yaw == 0 and self.sensorfusion.roll == 0 and self.sensorfusion.pitch == 0:
+        if self.orientation.yaw == 0 and self.orientation.roll == 0 and self.orientation.pitch == 0:
             raise Exception("Sensor fusion has not been started. Call start_sensorfusion() first.")
-        return self.sensorfusion.roll
+        return self.orientation.roll
 
     def set_motor_speed(self, pin, speed):
         # Ensure the speed is within the valid range (0 to 100)
@@ -110,7 +107,7 @@ class Robot:
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2 # Error in degrees
-        while abs(yaw_left) > error or current_yaw >= yaw_to_be and self.state == States.TURNING_LEFT:
+        while (abs(yaw_left) > error or current_yaw >= yaw_to_be) and self.state == States.TURNING_LEFT:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
@@ -125,7 +122,7 @@ class Robot:
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2
-        while abs(yaw_left) > error or current_yaw <= yaw_to_be and self.state == States.TURNING_RIGHT:
+        while (abs(yaw_left) > error or current_yaw <= yaw_to_be) and self.state == States.TURNING_RIGHT:
 
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
@@ -179,7 +176,7 @@ class Robot:
     '''
         start_sensorfusion() is a function that takes the values of the accelerometer, gyroscope, and magnetometer 
         and uses them to calculate the roll, pitch, and yaw of the robot using the Kalman Filter.
-        It should continuously run in the background and update the sensorfusion object with yaw, roll, and pitch as calculations and tasks are done.
+        It should continuously run in the background and update the orientation object with yaw, roll, and pitch as calculations and tasks are done.
     '''
     def start_sensorfusion(self):
 
@@ -229,11 +226,11 @@ class Robot:
             yaw += gz * dt
 
             # complementary filter
-            self.sensorfusion.roll = (0.96 * g_roll) + (0.04 * a_roll) 
-            self.sensorfusion.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
-            self.sensorfusion.yaw = yaw
+            self.orientation.roll = (0.96 * g_roll) + (0.04 * a_roll) 
+            self.orientation.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
+            self.orientation.yaw = yaw
 
-            print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.sensorfusion.roll, self.sensorfusion.pitch, self.sensorfusion.yaw))
+            print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
 
 
             time.sleep(.1) #5Hz
@@ -278,17 +275,30 @@ class Robot:
                     raise Exception("Invalid state!")
                 
     def start_ultrasound(self):
-        GPIO.setmode(GPIO.BOARD)
 
-        usensor1 = USensor(name="front1", trig=16, echo=18)
-        usensor2 = USensor(name="front2", trig=19, echo=21)
-        usensor3 = USensor(name="side1", trig=23, echo=24)
-        usensor4 = USensor(name="side2", trig=26, echo=22)
+        try:
 
-        while True:
-            if(usensor1.send_ultrasound() or usensor2.send_ultrasound() or usensor3.send_ultrasound() or usensor4.send_ultrasound()):
-                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter        
+            usensor1 = USensor(name="front1", trig=16, echo=18) #The values of trig & echo will be converted from BOARD pin name to TEGRA_SOC name
             time.sleep(0.5)
+            usensor2 = USensor(name="front2", trig=19, echo=21)
+            #usensor3 = USensor(name="side1", trig=23, echo=24)
+            #usensor4 = USensor(name="side2", trig=26, echo=22)
+
+            
+            if(usensor1.send_ultrasound()):
+                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter       
+                print("STOP") 
+
+            
+
+            if(usensor2.send_ultrasound()):
+                self.set_state(States.IDLE)
+                print("STOP")
+        
+        except Exception as e:
+            GPIO.cleanup()
+            print("Error:", e)
+            
 
     def start_object_detection(self):
         #TODO: Implement object detection
@@ -347,60 +357,26 @@ class Robot:
         finally:
             ser.close()
                 
-'''
-    robot_controller_gui() is a function that utilizes the tkinter module to create a GUI that allows the user to control the robot.
-'''
-@staticmethod
-def robot_controller_gui(robot):
-    # Create the main window
-    root = tk.Tk()
-    root.title("Henry Control")
-
-    # Create a frame to contain the buttons
-    button_frame = tk.Frame(root)
-    button_frame.pack(padx=20, pady=20)
-
-    # Create and configure buttons
-    # Note: The lambda function is used to pass a parameter to the function called by the button
-
-    button_cruise = tk.Button(button_frame, text="Cruise", command=lambda: robot.set_state(States.CRUISE))
-    button_forward = tk.Button(button_frame, text="Forward", command=lambda: robot.set_state(States.FORWARD))
-    button_reverse = tk.Button(button_frame, text="Reverse", command=lambda: robot.set_state(States.REVERSE))
-    button_left = tk.Button(button_frame, text="Left", command=lambda: robot.set_state(States.TURNING_LEFT))
-    button_right= tk.Button(button_frame, text="Right", command=lambda: robot.set_state(States.TURNING_RIGHT))
-    button_clockwise= tk.Button(button_frame, text="Clockwise", command=lambda: robot.set_state(States.CLOCKWISE))
-    button_counter_clockwise= tk.Button(button_frame, text="Counter Clockwise", command=lambda: robot.set_state(States.COUNTER_CLOCKWISE))
-    button_stop = tk.Button(button_frame, text="Stop", command=lambda: robot.set_state(States.IDLE))
-
-    # Pack the buttons
-    button_cruise.pack(side=tk.LEFT, padx=10)
-    button_forward.pack(side=tk.LEFT, padx=10)
-    button_left.pack(side=tk.LEFT, padx=10)
-    button_right.pack(side=tk.LEFT, padx=10)
-    button_clockwise.pack(side=tk.LEFT, padx=10)
-    button_counter_clockwise.pack(side=tk.LEFT, padx=10)
-    button_reverse.pack(side=tk.LEFT, padx=10)
-    button_stop.pack(side=tk.LEFT, padx=10)
-
-    # Start the Tkinter main loop
-    root.mainloop()
 
 
 if __name__ == "__main__":
-    robot = Robot(pwm_frequency=50)
-    
-    t1 = Thread(target=robot.start_movement_controller)
-    t2 = Thread(target=robot.start_sensorfusion)
-    t3 = Thread(target=robot.handle_incoming_data)
-    t4 = Thread(target=robot.start_ultrasound)
-    t1.start()
-    print("got here")
-    t2.start()
-    print("got here")
-    t3.start()
-    print("got here")
-    t4.start()
-    
+    try:
+        robot = Robot(pwm_frequency=50)
+        
+        t1 = Thread(target=robot.start_movement_controller)
+        #t2 = Thread(target=robot.start_sensorfusion)
+        t3 = Thread(target=robot.handle_incoming_data)
+        t4 = Thread(target=robot.start_ultrasound)
+        t1.start()
+        print("got here")
+        #t2.start()
+        print("got here")
+        t3.start()
+        print("got here")
+        t4.start()
+    except Exception as e:
+        print("Error", e)
+        GPIO.cleanup()
 
     '''
     p1 = Process(target=robot.start_movement_controller)

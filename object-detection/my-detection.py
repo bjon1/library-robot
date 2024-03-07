@@ -1,7 +1,7 @@
-from jetson_inference import detectNet
 from jetson_utils import videoSource, videoOutput
+from ultralytics import YOLO
 
-net = detectNet("ssd-mobilenet-v2", threshold=0.5)
+net = YOLO('yolov8n.pt')
 camera = videoSource("/dev/video0")
 display = videoOutput("display://0")
 
