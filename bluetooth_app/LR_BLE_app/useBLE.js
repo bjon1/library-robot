@@ -16,9 +16,8 @@ const BLE_SERVICE_CHARACTERISTIC = 'FFE1'//dummy characteristic
 const useBLE = () => {
 
     const bleManager = useMemo(() => new BleManager(), [])
-    const [ connectedDevice, setConnectedDevice ] = useState(null)
-    const [ allDevices, setAllDevices ] = useState([])
-    
+    const [ connectedDevice, setConnectedDevice ] = useState(0)
+
     const requestAndroid31Permissions = async () => {
         const bluetoothScanPermission = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
@@ -81,10 +80,11 @@ const useBLE = () => {
         return devices.some(device => device.id === newDevice.id)
     }
 
-    const scanAndConnect = () => {
+    const scanAndConnect = (callback) => {
         bleManager.startDeviceScan( null , { legacyScan:false } , (error, device) => {
             if(error) {
                 console.log(error)
+                callback(false)
             }
 
             if (
@@ -93,26 +93,30 @@ const useBLE = () => {
                   device.id == "68:5E:1C:5A:95:EE")
             ) {
                 bleManager.stopDeviceScan()
-                connectToDevice(device)
+                const result = connectToDevice(device)
+                callback(result)
             }
         })
     }
 
     const connectToDevice = async (device) => {
         try {
+            
             const connectedDevice = await bleManager.connectToDevice(device.id)
-            setConnectedDevice(connectedDevice)
-            alert("Connected to Henry!")
             await connectedDevice.discoverAllServicesAndCharacteristics()
+            setConnectedDevice(connectedDevice)
             //startListening(connectedDevice)
+            return true
         } catch(error) {
             console.error("Error in connection", error)
+            return false
         }
     }
 
-    const disconnectFromDevice = async () => {
-        if(connectedDevice) {
-            await bleManager.cancelDeviceConnection(connectedDevice.id)
+
+    const disconnectFromDevice = async (device) => {
+        if(device) {
+            await bleManager.cancelDeviceConnection(device.id)
             setConnectedDevice(null)
             alert("Disconnected From Henry")
         }
@@ -140,8 +144,11 @@ const useBLE = () => {
 
 
     const sendCommand = async (device, command) => {
+
+        console.log("Sending command", command)
+
         try {
-            if(connectedDevice) {
+            if(device) {
                 await bleManager.writeCharacteristicWithResponseForDevice(
                     device.id,
                     BLE_SERVICE_UUID,
@@ -158,12 +165,10 @@ const useBLE = () => {
     return {
         requestPermissions,
         scanAndConnect,
-        connectToDevice,
         disconnectFromDevice,
         startListening,
         sendCommand,
         connectedDevice,
-        allDevices
     }
 }
 
