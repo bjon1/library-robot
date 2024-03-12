@@ -307,7 +307,7 @@ class Robot:
 
     def handle_incoming_data(self):
         import serial
-        port = '/dev/ttyTHS1'
+        port = '/dev/ttyTHS1' # Jetson Nano UART port 8 (TXD), 10 (RXD)
         baud = 9600
 
         ser = serial.Serial(port, baud, timeout=0.5)
@@ -344,7 +344,6 @@ class Robot:
                         new_speed = int(data)
                 elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
                     new_state = States.IDLE
-                
                 if new_state is None:
                     new_state = self.state
                 if new_speed is None:
