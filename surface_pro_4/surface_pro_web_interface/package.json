@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm i -ws && npm run build -ws",
-    "start": "npm i -ws && npm run build -ws && node server/index.js",
+    "start": "node server/index.js",
     "dev": "nodemon server/index.js --watch server"
   },
   "keywords": [],
