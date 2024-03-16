@@ -4,22 +4,22 @@ const MainMenu = () => {
 
     const buttons = [
         {
-           image: "./img/move.png",
+           image: "./imgs/move.png",
            link: "/movement",
            name: "Movement"
         },
         {
-           image: "./img/diagnostics.png",
+           image: "./imgs/diagnostics.png",
            link: "/diagnostics",
            name: "Diagnostics"
         },
         {
-           image: "./img/smile.png",
+           image: "./imgs/smile.png",
            link: "/faces",
            name: "Faces"
         },
         {
-           image: "./img/camera.jpg",
+           image: "./imgs/camera.jpg",
            link: "/viewcameras",
            name: "View cameras"
         }
