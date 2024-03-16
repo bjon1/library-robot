@@ -7,9 +7,6 @@ import path, { dirname } from 'path'
 import { fileURLToPath } from 'url'
 import express from 'express'
 import cors from 'cors'
-import { SerialPort } from 'serialport'
-import pkg from '@serialport/parser-readline'; // Import the parser module from the serialport package, for ES6 compatibility
-const { ReadlineParser } = pkg;
 
 const app = express()
 
@@ -22,32 +19,10 @@ app.use(cors({
     credentials: true
 }))
 
-// Serial Port Communication
-
-const pathName = 'COM5'
-const port = new SerialPort({ path: pathName, baudRate: 9600 })
-
-// Create a parser to read lines from the serial port
-const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
-
-// Read data from the serial port
-parser.on("data", (line) => {
-    console.log(line);
-})
-
-// Write data to the serial port
-port.write("ROBOT POWER ON\n", (err) => {
-    if (err) {
-        return console.log('Error on write: ', err.message)
-    }
-    console.log('message written')
-})
-
 
 // Add Controllers
-import { robotController } from './controllers/robotController.js'
+import robotController from './controllers/robotController.js'
 app.use('/api/robot', robotController)
-
 
 
 app.get('*', (req, res) => { //catch all case for serving the static files, in case the user refreshes the page
