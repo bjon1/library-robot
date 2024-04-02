@@ -81,22 +81,29 @@ const useBLE = () => {
     }
 
     const scanAndConnect = (callback) => {
-        bleManager.startDeviceScan( null , { legacyScan:false } , (error, device) => {
-            if(error) {
-                console.log(error)
-                callback(false)
+        let timeoutId = null;
+        bleManager.startDeviceScan(null, { legacyScan:false }, (error, device) => {
+            if (error) {
+                console.log(error);
+                callback(false);
             }
-
+    
             if (
                 device &&
                 (device.name?.includes("HENRY") ||
-                  device.id == "68:5E:1C:5A:95:EE")
+                device.id == "68:5E:1C:5A:95:EE")
             ) {
-                bleManager.stopDeviceScan()
-                const result = connectToDevice(device)
-                callback(result)
+                clearTimeout(timeoutId);
+                bleManager.stopDeviceScan();
+                const result = connectToDevice(device);
+                callback(result);
             }
-        })
+        });
+    
+        timeoutId = setTimeout(() => {
+            bleManager.stopDeviceScan();
+            callback(false);
+        }, 3000); // 3 seconds
     }
 
     const connectToDevice = async (device) => {
