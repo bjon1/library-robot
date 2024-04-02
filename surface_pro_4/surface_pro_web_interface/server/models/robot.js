@@ -1,17 +1,43 @@
-// Serial Port Communication
-import { SerialPort } from 'serialport'
-const { ReadlineParser } = pkg;
-import pkg from '@serialport/parser-readline'; // Import the parser module from the serialport package, for ES6 compatibility
-const pathName = 'COM5'
-const port = new SerialPort({ path: pathName, baudRate: 9600 })
+// Serial portSender Communication
+import { SerialPort, ReadlineParser } from 'serialport'
 
-// Create a parser to read lines from the serial port
-const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
 
-// Read data from the serial port
-parser.on("data", (line) => {
-    console.log(line);
+const portSender = new SerialPort({
+    baudRate: 9600,
+    path: 'COM5'
 })
+
+const portReceiver = new SerialPort({
+    baudRate: 9600,
+    path: 'COM6'
+})
+
+setTimeout(() => {
+    portSender.write('test', (err) => {
+        if (err) {
+            return console.log('Error on write: ', err.message)
+        }
+        console.log('message written')
+    })
+}, 3000);
+
+
+
+const parser = portReceiver.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+
+let accumulatedData = '';
+
+portReceiver.on('data', (data) => {
+    accumulatedData += data.toString();
+});
+
+setInterval(() => {
+    if (accumulatedData !== '') {
+        console.log('Data:', parseInt(accumulatedData, 10));
+        accumulatedData = '';
+    }
+}, 100);
+
 
 const States = {
     CRUISE: 1,
@@ -27,7 +53,7 @@ const States = {
 
 const moveForward = () => {
     console.log("Backend: RobotAPI.moveForward")
-    port.write(States.CRUISE, (err) => {
+    portSender.write(Buffer.from([States.CRUISE]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -38,7 +64,7 @@ const moveForward = () => {
 
 const moveBackward = () => {
     console.log("Backend: RobotAPI.moveBackward")
-    port.write(States.REVERSE, (err) => {
+    portSender.write(Buffer.from([States.REVERSE]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -49,7 +75,7 @@ const moveBackward = () => {
 
 const turnLeft = () => {
     console.log("Backend: RobotAPI.turnLeft")
-    port.write(States.TURNING_LEFT, (err) => {
+    portSender.write(Buffer.from([States.TURNING_LEFT]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -60,7 +86,7 @@ const turnLeft = () => {
 
 const turnRight = () => {
     console.log("Backend: RobotAPI.turnRight")
-    port.write(States.TURNING_RIGHT, (err) => {
+    portSender.write(Buffer.from([States.TURNING_RIGHT]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -71,7 +97,7 @@ const turnRight = () => {
 
 const turnClockwise = () => {
     console.log("Backend: RobotAPI.turnClockwise")
-    port.write(States.CLOCKWISE, (err) => {
+    portSender.write(Buffer.from([States.CLOCKWISE]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -82,7 +108,7 @@ const turnClockwise = () => {
 
 const turnCounterClockwise = () => {
     console.log("Backend: RobotAPI.turnCounterClockwise")
-    port.write(States.COUNTER_CLOCKWISE, (err) => {
+    portSender.write(Buffer.from([States.COUNTER_CLOCKWISE]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -93,7 +119,7 @@ const turnCounterClockwise = () => {
 
 const stopRobot = () => {
     console.log("Backend: RobotAPI.stopRobot")
-    port.write(States.STOP, (err) => {
+    portSender.write(Buffer.from([States.STOP]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }
@@ -104,7 +130,7 @@ const stopRobot = () => {
 
 const setRobotSpeed = (speed) => {
     console.log("Backend: RobotAPI.setRobotSpeed")
-    port.write(speed, (err) => {
+    portSender.write(Buffer.from([speed]), (err) => {
         if (err) {
             return console.log('Error on write: ', err.message)
         }

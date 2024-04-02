@@ -56,6 +56,7 @@ const stopRobot = () => {
 
 const setRobotSpeed = (speed) => {
     console.log('RobotAPI.setRobotSpeed');
+    speed = Math.min(100, Math.max(10, speed))
     const response = request('POST', '/api/robot/set-speed', { speed })
     return response
 }

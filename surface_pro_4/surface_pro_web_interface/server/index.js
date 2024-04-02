@@ -14,7 +14,6 @@ const app = express()
 app.use(express.json())
 app.use(express.static(path.join(dirname(fileURLToPath(import.meta.url)), '../client/dist'))) // serve static files from the client side
 app.use(cors({
-    origin: 'http://localhost:3000', // origin of the request
     methods: 'GET,POST,PUT,DELETE,PATCH',
     credentials: true
 }))
