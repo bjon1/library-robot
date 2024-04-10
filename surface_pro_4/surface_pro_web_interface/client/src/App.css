@@ -100,8 +100,8 @@ img:hover, .menuimg:active {
 }
 
 .buttonImage {
-    width: 50em;
-    height: 50em;
+    width: 11em;
+    height: 11em;
 }
 
 .buttonImage:hover, .buttonImage:active {
@@ -110,10 +110,23 @@ img:hover, .menuimg:active {
 }
 
 .Movement__Slider {
+    margin-top: 3em;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 2rem;
+}
+
+.Movement__Slider > i {
+    font-size: 5em;
+    color: #000000;
+    cursor: pointer;
+}
+
+.Slider__text {
+    font-size: 2em;
+    font-weight: bold;
+    color: #000000;
 }
 
 .row {

@@ -3,13 +3,22 @@ import RobotAPI from '../../utilities/RobotAPI';
 
 const Movement = () => {
 
-    const [range, setRange] = useState('50');
-    const [sliding, setSliding] = useState(false);
+    const [range, setRange] = useState(50);
 
-    const updateSlider = (value) => {
-        setSliding(true);
-        setRange(value);
-    };
+    const changeSpeed = (e) => {
+        if (e.target.classList.contains('fa-circle-arrow-left')) {
+            if (range > 0) {
+                setRange(range - 10);
+                RobotAPI.setRobotSpeed(range - 10);
+            }
+        }
+        if (e.target.classList.contains('fa-circle-arrow-right')) {
+            if (range < 100) {
+                setRange(range + 10);
+                RobotAPI.setRobotSpeed(range + 10);
+            }
+        }
+    }
 
     const buttonData = [
         { title: 'Left 90', image: '../imgs/turn-left.png', onPress: () => RobotAPI.turnLeft() },
@@ -55,16 +64,12 @@ const Movement = () => {
                     </button>
                 </div>
             </div>
-            <div className="Movement__Slider" onMouseEnter={() => RobotAPI.setRobotSpeed(parseInt(range) < '10' ? '10' : parseInt(range))}>
-                <p className="SliderText">{parseInt(range) + '%'}</p>
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={range}
-                    className="slider"
-                    onChange={event => updateSlider(event.target.value)}
-                />
+            <div className="Movement__Slider">
+                <i class="fa-solid fa-circle-arrow-left" onClick={changeSpeed}></i>
+                <div className="Slider__text">
+                    {range}
+                </div>
+                <i class="fa-solid fa-circle-arrow-right" onClick={changeSpeed}></i>
             </div>
         </>
     )
