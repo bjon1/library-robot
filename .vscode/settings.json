@@ -1,6 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./jetson-inference/python/python",
-        "./jetson-inference/utils/python/python"
-    ]
-}

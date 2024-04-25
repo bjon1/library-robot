@@ -3,6 +3,9 @@ import time
 import board
 import busio
 import numpy as np
+from threading import Thread
+import socket
+import time
 import Jetson.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
 from mpu9250_i2c import *
@@ -10,16 +13,16 @@ from SensorFusion import Orientation
 from PIDController import PIDController
 from USensor import USensor
 from States import States
-from threading import Thread
-from multiprocessing import Process
 
+
+'''
+The Robot class is a class that represents the robot and its capabilities. 
+It is responsible for controlling the robot's motors, reading sensor data, 
+and handling incoming requests from the Bluetooth and TCP/IP connections.
+'''
 class Robot:
 
-
-
     def __init__(self, pwm_frequency):
-
-
 
         # Initialize PCA9685 object with I2C
         self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) #28, 27
@@ -235,7 +238,6 @@ class Robot:
 
             #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
 
-
             time.sleep(.1) #5Hz
             
     def set_state(self, new_state):
@@ -293,24 +295,18 @@ class Robot:
             #usensor3 = USensor(name="side1", trig=23, echo=24)
             #usensor4 = USensor(name="side2", trig=26, echo=22)
 
-            
             while True:
                 if(usensor1.send_ultrasound() or usensor2.send_ultrasound()):
                     self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter       
                     print("STOP") 
                 time.sleep(0.2)
-
-            
-
-           
         
         except Exception as e:
             GPIO.cleanup()
             print("Error:", e)
-            
+        
 
-
-    def handle_incoming_data(self):
+    def start_BLE_app_communicator(self):
         import serial
         port = '/dev/ttyUSB0' # Jetson Nano UART port 8 (TXD), 10 (RXD)
         baud = 9600
@@ -345,7 +341,7 @@ class Robot:
                             9: States.IDLE
                         }
                         new_state = command_to_state.get(data)
-                    elif data >= 10 and data <= 100: 
+                    elif data >= 10 and data <= 90: 
                         new_speed = int(data)
                 elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
                     new_state = States.IDLE
@@ -361,53 +357,98 @@ class Robot:
             pass
         finally:
             ser.close()
-                
 
+    def start_surface_pro_communicator(self):
+        host = '137.140.212.230'
+        port = 50000
+        
+        # Create a socket object
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Bind the socket to a specific host and port
+        server_socket.bind((host, port))
+
+        # Enable the server to accept connections
+        server_socket.listen()
+
+        print(f'Server is listening on {host}:{port}')
+
+        while True:
+        
+            # Establish a connection with the client
+            client_socket, addr = server_socket.accept()
+
+            print(f'Got connection from {addr}')
+
+            # Send a thank you message to the client
+            client_socket.send(b'Thank you for connecting')
+
+            while True:
+                try:
+                    # Receive data from the client
+                    data = client_socket.recv(1024)
+                except ConnectionResetError:
+                    print('Client disconnected')
+                    break
+                
+                uint8_data = [i for i in data]  # Convert bytes to list of integers
+                if len(uint8_data) <= 1:
+                    data = uint8_data[0]
+                else:
+                    data = ''
+                    for i in uint8_data:
+                        data += chr(i)
+
+                print(f'TCP Received data: {data}')
+
+
+                # Parse incoming data
+                new_state = None
+                new_speed = None                
+                if data and data.isdigit():
+                    data = int(data)
+                    if data > 0 and data < 10:
+                        command_to_state = {
+                            1: States.CRUISE,
+                            2: States.FORWARD,
+                            3: States.REVERSE,
+                            4: States.TURNING_LEFT,
+                            5: States.TURNING_RIGHT,
+                            6: States.CLOCKWISE,
+                            7: States.COUNTER_CLOCKWISE,
+                            8: States.IDLE,
+                            9: States.IDLE
+                        }
+                        new_state = command_to_state.get(data)
+                    elif data >= 10 and data <= 90: 
+                        new_speed = int(data)
+
+                if new_state: # Check if we updated the state
+                    self.set_state(new_state)
+                if new_speed:
+                    self.set_speed(new_speed) # Check if we updated the speed
+                print("STATE, SPEED (TCP)", self.state, self.speed)
+                time.sleep(0.05)
 
 if __name__ == "__main__":
     try:
         robot = Robot(pwm_frequency=50)
-        
-        t1 = Thread(target=robot.start_movement_controller)
-        t2 = Thread(target=robot.start_sensorfusion)
-        #t3 = Thread(target=robot.handle_incoming_data)
-        t4 = Thread(target=robot.start_ultrasound)
-        #t4.start()
-        print("Starting Ultrasound...")
+        t1 = Thread(target=robot.start_ultrasound)
+        t2 = Thread(target=robot.start_movement_controller)
+        t3 = Thread(target=robot.start_sensorfusion)
+        t4 = Thread(target=robot.start_BLE_app_communicator)
+        t5 = Thread(target=robot.start_surface_pro_communicator)
         t1.start()
-        print("Starting Movement Controller...")
+        print("Starting Ultrasound...")
         t2.start()
+        print("Starting Movement Controller...")
+        t3.start()
         print("Starting Sensor Fusion...")
-        #t3.start()
-        print("Starting Data Parser...")
+        t4.start()
+        print("Starting Bluetooth Data Parser...")
+        t5.start()
+        print("Starting Surface Pro Communicator")
 
-        
     except Exception as e:
         print("Error", e)
         GPIO.cleanup()
-
-    '''
-    p1 = Process(target=robot.start_movement_controller)
-    p2 = Process(target=robot.start_sensorfusion)
-    p3 = Process(target=lambda: robot_controller_keyboard(robot)) #replace this process with keyboard arrow key controls
-    p1.start()
-    print("got here")
-    p2.start()
-    print("got here")
-    p3.start()
-    '''
-
-
-    ''' Overall sequence; to be replaced by Process class
-    # Create threads to run processes simultaneously
-    t1 = Thread(target=robot.start_sensorfusion)
-    t1.start()
-    time.sleep(4) # Wait for the sensor fusion to start & initialize for accurate readings
-    t2 = Thread(target=robot.start_ultrasound)
-    t3 = Thread(target=robot.start_movement_controller)
-    t2.start()
-    t3.start()
-
-    # robot.start_object_detection() T4
-    # robot.start_pathfinding() T5
-    '''
