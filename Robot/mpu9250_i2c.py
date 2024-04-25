@@ -12,6 +12,33 @@
 #
 import smbus, time
 
+# MPU6050 Registers
+MPU6050_ADDR = 0x68
+PWR_MGMT_1   = 0x6B
+SMPLRT_DIV   = 0x19
+CONFIG       = 0x1A
+GYRO_CONFIG  = 0x1B
+ACCEL_CONFIG = 0x1C
+INT_PIN_CFG  = 0x37
+INT_ENABLE   = 0x38
+ACCEL_XOUT_H = 0x3B
+ACCEL_YOUT_H = 0x3D
+ACCEL_ZOUT_H = 0x3F
+TEMP_OUT_H   = 0x41
+GYRO_XOUT_H  = 0x43
+GYRO_YOUT_H  = 0x45
+GYRO_ZOUT_H  = 0x47
+#AK8963 registers
+AK8963_ADDR   = 0x0C
+AK8963_ST1    = 0x02
+HXH          = 0x04
+HYH          = 0x06
+HZH          = 0x08
+AK8963_ST1   = 0x02
+AK8963_ST2   = 0x09
+AK8963_CNTL  = 0x0A
+AK8963_ASAX = 0x10
+
 def MPU6050_start():
     # reset all sensors
     bus.write_byte_data(MPU6050_ADDR,PWR_MGMT_1,0x80)
@@ -135,33 +162,6 @@ def AK8963_conv():
     m_y = (mag_y/(2.0**15.0))*mag_sens
     m_z = (mag_z/(2.0**15.0))*mag_sens
     return m_x, m_y, m_z
-    
-# MPU6050 Registers
-MPU6050_ADDR = 0x68
-PWR_MGMT_1   = 0x6B
-SMPLRT_DIV   = 0x19
-CONFIG       = 0x1A
-GYRO_CONFIG  = 0x1B
-ACCEL_CONFIG = 0x1C
-INT_PIN_CFG  = 0x37
-INT_ENABLE   = 0x38
-ACCEL_XOUT_H = 0x3B
-ACCEL_YOUT_H = 0x3D
-ACCEL_ZOUT_H = 0x3F
-TEMP_OUT_H   = 0x41
-GYRO_XOUT_H  = 0x43
-GYRO_YOUT_H  = 0x45
-GYRO_ZOUT_H  = 0x47
-#AK8963 registers
-AK8963_ADDR   = 0x0C
-AK8963_ST1    = 0x02
-HXH          = 0x04
-HYH          = 0x06
-HZH          = 0x08
-AK8963_ST1   = 0x02
-AK8963_ST2   = 0x09
-AK8963_CNTL  = 0x0A
-AK8963_ASAX = 0x10
 
 mag_sens = 4800.0 # magnetometer sensitivity: 4800 uT 
 #measurement range is +- 4900uT

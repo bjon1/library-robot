@@ -44,7 +44,7 @@ class Robot:
         # Initialize the Kalman filter
         self.orientation = Orientation()
         self.state = States.IDLE # This variable is only to be changed and accessed by set_state() 
-        self.speed = 50 # This variable is only to be changed and accessed by set_speed() and handle_state_change()
+        self.speed = 50
 
         self.state_queue = []
 
@@ -211,35 +211,39 @@ class Robot:
         yaw = 0
     
         t_current = time.time()
+        
         while True:
-            
-            ax,ay,az,gx,gy,gz = mpu6050_conv() # read and convert mpu6050 data
-            #mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
+            try:
+                ax,ay,az,gx,gy,gz = mpu6050_conv() # read and convert mpu6050 data
+                #mx,my,mz = AK8963_conv() # read and convert AK8963 magnetometer data
 
-            a_roll = (math.atan(ay / math.sqrt(pow(ax, 2) + pow(az, 2))) * 180 / math.pi) - ax_error
-            a_pitch = (math.atan(-1 * ax / math.sqrt(pow(ay, 2) + pow(az, 2))) * 180 / math.pi) - ay_error
+                a_roll = (math.atan(ay / math.sqrt(pow(ax, 2) + pow(az, 2))) * 180 / math.pi) - ax_error
+                a_pitch = (math.atan(-1 * ax / math.sqrt(pow(ay, 2) + pow(az, 2))) * 180 / math.pi) - ay_error
 
-            gx -= gx_error
-            gy -= gy_error
-            gz -= gz_error
+                gx -= gx_error
+                gy -= gy_error
+                gz -= gz_error
 
-            t_previous = t_current
-            t_current = time.time()
-            dt = t_current - t_previous # make sure this is in seconds
+                t_previous = t_current
+                t_current = time.time()
+                dt = t_current - t_previous # make sure this is in seconds
 
-            g_roll += gx * dt
-            g_pitch += gy * dt
-            yaw += gz * dt
+                g_roll += gx * dt
+                g_pitch += gy * dt
+                yaw += gz * dt
 
-            # complementary filter
-            self.orientation.roll = (0.96 * g_roll) + (0.04 * a_roll) 
-            self.orientation.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
-            self.orientation.yaw = yaw
+                # complementary filter
+                self.orientation.roll = (0.96 * g_roll) + (0.04 * a_roll) 
+                self.orientation.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
+                self.orientation.yaw = yaw
 
-            #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
+                #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
 
-            time.sleep(.1) #5Hz
-            
+                time.sleep(.1) #5Hz
+            except Exception as e:
+                print("Error:", e)
+                continue
+        
     def set_state(self, new_state):
         # Ensure the state is valid
         if new_state in States:               
@@ -248,22 +252,18 @@ class Robot:
             raise Exception("Invalid state! This is most likely a programming error.")
         
     def set_speed(self, new_speed):
-        if 10 <= new_speed <= 100:
-            self.speed = new_speed
-        else:
-            raise Exception("Invalid speed! This is most likely a programming error")
+        # Ensure the speed is within the valid range (0 to 100)
+        self.speed = max(0, min(100, new_speed))
 
     # start_movement_controller() is a function that handles incoming bluetooth requests, continuously checks the state of the robot, and performs the appropriate action based on the state.
     def start_movement_controller(self):
         current_state = self.state  # Get the initial state
-        current_speed = self.speed
         while True:
-            if(current_state != self.state or current_speed != self.speed):
+            if(current_state != self.state):
                 self.stop()
                 time.sleep(0.05)
                 # State or speed has changed, handle it here
                 current_state = self.state  # Update the current state and speed
-                current_speed = self.speed
 
                 if self.state == States.FORWARD:
                     self.move_forward(speed=self.speed)
@@ -284,47 +284,33 @@ class Robot:
                 else:
                     raise Exception("Invalid state!")
             time.sleep(0.8)
-                
-    def start_ultrasound(self):
-
-        try:
-
-            usensor1 = USensor(name="front1", trig=16, echo=18) #The values of trig & echo will be converted from BOARD pin name to TEGRA_SOC name
-            time.sleep(0.5)
-            usensor2 = USensor(name="front2", trig=19, echo=21)
-            #usensor3 = USensor(name="side1", trig=23, echo=24)
-            #usensor4 = USensor(name="side2", trig=26, echo=22)
-
-            while True:
-                if(usensor1.send_ultrasound() or usensor2.send_ultrasound()):
-                    self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter       
-                    print("STOP") 
-                time.sleep(0.2)
-        
-        except Exception as e:
-            GPIO.cleanup()
-            print("Error:", e)
         
 
-    def start_BLE_app_communicator(self):
+    def handle_serial_ports(self):
         import serial
-        port = '/dev/ttyUSB0' # Jetson Nano UART port 8 (TXD), 10 (RXD)
-        baud = 9600
+        port_bluetooth = '/dev/ttyUSB0' 
+        baud_bluetooth = 9600
 
-        ser = serial.Serial(port, baud, timeout=0.5)
+        port_ultrasound = '/dev/ttyTHS1'
+        baud_ultrasound = 9600
 
-        print("Connected to: " + ser.portstr)
+        ser_bluetooth = serial.Serial(port_bluetooth, baud_bluetooth, timeout=0.5)
+        ser_ultrasound = serial.Serial(port_ultrasound, baud_ultrasound, timeout=0.5)
 
-        try:
-            while True:
+        print("Connected to: " + ser_bluetooth.portstr)
+        print("Connected to: " + ser_ultrasound.portstr)
+
+        
+        while True:
+            try:
                 data = None
-                new_state = None
-                new_speed = None
+                new_state = self.state
+                new_speed = self.speed
 
                 # Check for incoming bluetooth requests
-                if ser.in_waiting > 0:
-                    data = ser.read(ser.in_waiting).decode('utf-8')
-                    print("Found New Data", data)
+                if ser_bluetooth.in_waiting > 0:
+                    data = ser_bluetooth.read(ser_bluetooth.in_waiting).decode('utf-8')
+                    print("Found new Data (Bluetooth):", data)
 
                 if data and data.isdigit():
                     data = int(data)
@@ -343,20 +329,29 @@ class Robot:
                         new_state = command_to_state.get(data)
                     elif data >= 10 and data <= 90: 
                         new_speed = int(data)
+                        self.set_speed(new_speed)
                 elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
                     new_state = States.IDLE
 
-                if new_state: # Check if we updated the state
-                    self.set_state(new_state)
-                if new_speed:
-                    self.set_speed(new_speed) # Check if we updated the speed
-                print("STATE, SPEED (Bluetooth)", self.state, self.speed)
+                self.set_state(new_state)
+                print("STATE, SPEED (Bluetooth)", self.state)
+
+                # Check for incoming ultrasound data
+                if ser_ultrasound.in_waiting > 0:
+                    data = ser_ultrasound.read(ser_ultrasound.in_waiting).decode('utf-8')
+                    print("Found New Data (Ultrasound): ", data)
 
                 time.sleep(0.4)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            ser.close()
+
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print("Error:", e)
+                continue
+            finally:
+                ser_bluetooth.close()
+                ser_ultrasound.close()
+
 
     def start_surface_pro_communicator(self):
         host = '137.140.212.230'
@@ -399,12 +394,12 @@ class Robot:
                     for i in uint8_data:
                         data += chr(i)
 
-                print(f'TCP Received data: {data}')
+                print(f'Found New Data (TCP): {data}')
 
 
                 # Parse incoming data
-                new_state = None
-                new_speed = None                
+                new_state = self.state
+                new_speed = self.speed              
                 if data and data.isdigit():
                     data = int(data)
                     if data > 0 and data < 10:
@@ -422,33 +417,28 @@ class Robot:
                         new_state = command_to_state.get(data)
                     elif data >= 10 and data <= 90: 
                         new_speed = int(data)
+                        self.set_speed(new_speed)
 
-                if new_state: # Check if we updated the state
-                    self.set_state(new_state)
-                if new_speed:
-                    self.set_speed(new_speed) # Check if we updated the speed
+                self.set_state(new_state)
                 print("STATE, SPEED (TCP)", self.state, self.speed)
                 time.sleep(0.05)
 
 if __name__ == "__main__":
     try:
         robot = Robot(pwm_frequency=50)
-        t1 = Thread(target=robot.start_ultrasound)
-        t2 = Thread(target=robot.start_movement_controller)
-        t3 = Thread(target=robot.start_sensorfusion)
-        t4 = Thread(target=robot.start_BLE_app_communicator)
-        t5 = Thread(target=robot.start_surface_pro_communicator)
+        t1 = Thread(target=robot.start_movement_controller)
+        t2 = Thread(target=robot.start_sensorfusion)
+        t3 = Thread(target=robot.handle_serial_ports)
+        t4 = Thread(target=robot.start_surface_pro_communicator)
         t1.start()
-        print("Starting Ultrasound...")
-        t2.start()
         print("Starting Movement Controller...")
-        t3.start()
+        t2.start()
         print("Starting Sensor Fusion...")
+        t3.start()
+        print("Starting Bluetooth & Ultrasound...")
         t4.start()
-        print("Starting Bluetooth Data Parser...")
-        t5.start()
         print("Starting Surface Pro Communicator")
 
     except Exception as e:
-        print("Error", e)
+        print("Error, there was a bug!", e)
         GPIO.cleanup()
