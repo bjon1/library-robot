@@ -1,5 +1,5 @@
 /* eslint-disable no-bitwise */
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { PermissionsAndroid, Platform } from 'react-native'
 import DeviceInfo from 'react-native-device-info';
 import { atob, btoa } from 'react-native-quick-base64'
@@ -17,6 +17,13 @@ const useBLE = () => {
 
     const bleManager = useMemo(() => new BleManager(), [])
     const [ connectedDevice, setConnectedDevice ] = useState(0)
+
+    useEffect(() => {
+        bleManager.onDeviceDisconnected((error, device) => {
+            alert("Disconnected From Henry")
+            setConnectedDevice(null)
+        })
+    }, [])
 
     const requestAndroid31Permissions = async () => {
         const bluetoothScanPermission = await PermissionsAndroid.request(
@@ -129,12 +136,13 @@ const useBLE = () => {
         }
     }
 
-
+    /* Update this function to receive data */
     const onUpdate = (error, characteristic) => {
         // handle the data from the characteristic
         //atob(characteristic.value)
     }
 
+    /* Update this function to receive data */    
     const startListening = async (device) => {
         /*
         if (device) {

@@ -294,7 +294,7 @@ class Robot:
         port_ultrasound = '/dev/ttyTHS1'
         baud_ultrasound = 9600
 
-        ser_bluetooth = serial.Serial(port_bluetooth, baud_bluetooth, timeout=0.5)
+        ser_bluetooth = serial.Serial(port_bluetooth, baud_bluetooth, timeout=0.5) 
         ser_ultrasound = serial.Serial(port_ultrasound, baud_ultrasound, timeout=0.5)
 
         print("Connected to: " + ser_bluetooth.portstr)
@@ -340,6 +340,8 @@ class Robot:
                 if ser_ultrasound.in_waiting > 0:
                     data = ser_ultrasound.read(ser_ultrasound.in_waiting).decode('utf-8')
                     print("Found New Data (Ultrasound): ", data)
+                # Parse incoming ultrasound data
+                #TODO: Implement the logic to handle the ultrasound data
 
                 time.sleep(0.4)
 

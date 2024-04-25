@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   ButtonText: {
     fontSize: responsive(25),
     fontWeight: 'bold',
-    color: 'white',
+    color: white,
   },
 });
 
