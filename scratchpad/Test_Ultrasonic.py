@@ -83,7 +83,9 @@ class USensor:
 GPIO.setmode(GPIO.TEGRA_SOC) #GPIO Mode BOARD
 usensor1 = USensor(name="front1", trig=16, echo=18)
 usensor2 = USensor(name="front2", trig=19, echo=21)
-usensor1.start_ultrasound()
+t4 = Thread(target=usensor1.start_ultrasound())
+t4.start()
+
 
 #usensor2 = USensor(name="front2", trig=19, echo=21)
 #usensor3 = USensor(name="side1", trig=23, echo=24)

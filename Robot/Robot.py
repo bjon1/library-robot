@@ -2,6 +2,7 @@ import math
 import time
 import board
 import busio
+import numpy as np
 import Jetson.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
 from mpu9250_i2c import *
@@ -107,9 +108,11 @@ class Robot:
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2 # Error in degrees
-        while (abs(yaw_left) > error or current_yaw >= yaw_to_be) and self.state == States.TURNING_LEFT:
+        while ((abs(yaw_left) > error or (current_yaw >= yaw_to_be)) and self.state == States.TURNING_LEFT):
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
+            print("YAWLEFT", yaw_left)
+            print("YAWTOBE", yaw_to_be)
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             #print("turn_speed", turn_speed)
             self.counter_clockwise(turn_speed)
@@ -122,7 +125,7 @@ class Robot:
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2
-        while (abs(yaw_left) > error or current_yaw <= yaw_to_be) and self.state == States.TURNING_RIGHT:
+        while ((abs(yaw_left) > error) or (current_yaw <= yaw_to_be) and self.state == States.TURNING_RIGHT):
 
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
@@ -230,30 +233,35 @@ class Robot:
             self.orientation.pitch = (0.96 * g_pitch) + (0.04 * a_pitch) 
             self.orientation.yaw = yaw
 
-            print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
+            #print("Roll: {0} ; Pitch: {1} ; Yaw: {2}".format(self.orientation.roll, self.orientation.pitch, self.orientation.yaw))
 
 
             time.sleep(.1) #5Hz
             
-    def set_state(self, new_state, speed=None):
+    def set_state(self, new_state):
         # Ensure the state is valid
-        if new_state in States:
-            if speed is not None:
-                self.speed = max(0, min(100, speed))
+        if new_state in States:               
             self.state = new_state
         else:
-            raise Exception("Invalid state!")
-            
+            raise Exception("Invalid state! This is most likely a programming error.")
+        
+    def set_speed(self, new_speed):
+        if 10 <= new_speed <= 100:
+            self.speed = new_speed
+        else:
+            raise Exception("Invalid speed! This is most likely a programming error")
 
     # start_movement_controller() is a function that handles incoming bluetooth requests, continuously checks the state of the robot, and performs the appropriate action based on the state.
     def start_movement_controller(self):
         current_state = self.state  # Get the initial state
+        current_speed = self.speed
         while True:
-            if(current_state != self.state):
+            if(current_state != self.state or current_speed != self.speed):
                 self.stop()
                 time.sleep(0.05)
-                # State has changed, handle it here
-                current_state = self.state  # Update the current state
+                # State or speed has changed, handle it here
+                current_state = self.state  # Update the current state and speed
+                current_speed = self.speed
 
                 if self.state == States.FORWARD:
                     self.move_forward(speed=self.speed)
@@ -273,6 +281,7 @@ class Robot:
                     self.cruise_control(speed=self.speed)
                 else:
                     raise Exception("Invalid state!")
+            time.sleep(0.8)
                 
     def start_ultrasound(self):
 
@@ -285,29 +294,25 @@ class Robot:
             #usensor4 = USensor(name="side2", trig=26, echo=22)
 
             
-            if(usensor1.send_ultrasound()):
-                self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter       
-                print("STOP") 
+            while True:
+                if(usensor1.send_ultrasound() or usensor2.send_ultrasound()):
+                    self.set_state(States.IDLE) # Stop the robot if an object is within 1 meter       
+                    print("STOP") 
+                time.sleep(0.2)
 
             
 
-            if(usensor2.send_ultrasound()):
-                self.set_state(States.IDLE)
-                print("STOP")
+           
         
         except Exception as e:
             GPIO.cleanup()
             print("Error:", e)
             
 
-    def start_object_detection(self):
-        #TODO: Implement object detection
-        pass
-
 
     def handle_incoming_data(self):
         import serial
-        port = '/dev/ttyTHS1' # Jetson Nano UART port 8 (TXD), 10 (RXD)
+        port = '/dev/ttyUSB0' # Jetson Nano UART port 8 (TXD), 10 (RXD)
         baud = 9600
 
         ser = serial.Serial(port, baud, timeout=0.5)
@@ -344,13 +349,14 @@ class Robot:
                         new_speed = int(data)
                 elif data == 'OK+LOST' or data == 'OK+CONN': # OK+CONN or OK+LOST
                     new_state = States.IDLE
-                if new_state is None:
-                    new_state = self.state
-                if new_speed is None:
-                    new_speed = self.speed
-                self.set_state(new_state, new_speed)
-                print("STATE", self.state)
-                time.sleep(0.20)
+
+                if new_state: # Check if we updated the state
+                    self.set_state(new_state)
+                if new_speed:
+                    self.set_speed(new_speed) # Check if we updated the speed
+                print("STATE, SPEED (Bluetooth)", self.state, self.speed)
+
+                time.sleep(0.4)
         except KeyboardInterrupt:
             pass
         finally:
@@ -363,16 +369,19 @@ if __name__ == "__main__":
         robot = Robot(pwm_frequency=50)
         
         t1 = Thread(target=robot.start_movement_controller)
-        #t2 = Thread(target=robot.start_sensorfusion)
-        t3 = Thread(target=robot.handle_incoming_data)
+        t2 = Thread(target=robot.start_sensorfusion)
+        #t3 = Thread(target=robot.handle_incoming_data)
         t4 = Thread(target=robot.start_ultrasound)
+        #t4.start()
+        print("Starting Ultrasound...")
         t1.start()
-        print("got here")
-        #t2.start()
-        print("got here")
-        t3.start()
-        print("got here")
-        t4.start()
+        print("Starting Movement Controller...")
+        t2.start()
+        print("Starting Sensor Fusion...")
+        #t3.start()
+        print("Starting Data Parser...")
+
+        
     except Exception as e:
         print("Error", e)
         GPIO.cleanup()
