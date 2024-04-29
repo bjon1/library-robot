@@ -1,7 +1,7 @@
 import net from 'net'
 
 const port = 50000;
-const host = '137.140.213.134'
+const host = '137.140.212.230'
 
 const client = new net.Socket();
 

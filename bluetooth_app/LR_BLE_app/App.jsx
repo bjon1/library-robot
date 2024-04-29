@@ -12,6 +12,10 @@ const white = '#FAF9F9'
 const App = () => {
 
   useEffect(() => {
+    onDeviceDisconnected((device) => {
+      alert("Disconnected from Henry")
+      setConnectedDevice(null);
+    })
     Orientation.lockToPortrait();
 
     return () => {
@@ -20,7 +24,7 @@ const App = () => {
   }, [])
 
 
-  const { requestPermissions, scanAndConnect, disconnectFromDevice, sendCommand, connectedDevice } = useBLE()
+  const { requestPermissions, scanAndConnect, disconnectFromDevice, onDeviceDisconnected, sendCommand, connectedDevice, setConnectedDevice } = useBLE()
 
 
   const pressConnect = async () => {

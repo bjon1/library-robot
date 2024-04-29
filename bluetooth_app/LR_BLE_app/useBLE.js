@@ -18,20 +18,24 @@ const useBLE = () => {
     const bleManager = useMemo(() => new BleManager(), [])
     const [ connectedDevice, setConnectedDevice ] = useState(0)
 
-    useEffect(() => {
+    const onDeviceDisconnected = (callback) => {
         bleManager.onDeviceDisconnected((error, device) => {
-            alert("Disconnected From Henry")
-            setConnectedDevice(null)
-        })
-    }, [])
+            if (error) {
+                console.error('An error occurred while disconnecting:', error);
+            } else {
+                console.log('Device disconnected:', device);
+            }
+            callback(device)
+        });
+    }
 
     const requestAndroid31Permissions = async () => {
         const bluetoothScanPermission = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
                 {
-                title: "Location Permission",
-                message: "Bluetooth Low Energy requires Location",
-                buttonPositive: "OK",
+                    title: "Location Permission",
+                    message: "Bluetooth Low Energy requires Location",
+                    buttonPositive: "OK",
                 }
         );
         const bluetoothConnectPermission = await PermissionsAndroid.request(
@@ -97,7 +101,7 @@ const useBLE = () => {
     
             if (
                 device &&
-                (device.name?.includes("HENRY") ||
+                (device.name?.includes("DSD TECH") ||
                 device.id == "68:5E:1C:5A:95:EE")
             ) {
                 clearTimeout(timeoutId);
@@ -173,6 +177,8 @@ const useBLE = () => {
             } 
         } catch(error) {
             console.error("Error in sending command", error)
+            alert("Disconnected From Henry")
+            setConnectedDevice(null)
         }
     }
 
@@ -183,7 +189,9 @@ const useBLE = () => {
         disconnectFromDevice,
         startListening,
         sendCommand,
+        onDeviceDisconnected,
         connectedDevice,
+        setConnectedDevice
     }
 }
 

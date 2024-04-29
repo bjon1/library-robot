@@ -309,6 +309,7 @@ class Robot:
 
                 # Check for incoming bluetooth requests
                 if ser_bluetooth.in_waiting > 0:
+                    print(type(ser_bluetooth.in_waiting))
                     data = ser_bluetooth.read(ser_bluetooth.in_waiting).decode('utf-8')
                     print("Found new Data (Bluetooth):", data)
 
