@@ -35,11 +35,12 @@ def close_connection():
 
 def send_data(data):
     data_bytes = struct.pack('B', data)
+    print("SENDING", data_bytes)
     s.send(data_bytes)
 
 bp = Blueprint('robot', __name__)
 
-@bp.route('/move-forward')
+@bp.route('/move-forward', methods=['POST'])
 def move_forward():
     try:
         send_data(States["CRUISE"])
@@ -47,7 +48,7 @@ def move_forward():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/move-backward')
+@bp.route('/move-backward', methods=['POST'])
 def move_backward():  
     try:
         send_data(States["REVERSE"])
@@ -55,7 +56,7 @@ def move_backward():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/turn-left')
+@bp.route('/turn-left', methods=['POST'])
 def turn_left():
     try:
         send_data(States["TURNING_LEFT"])
@@ -63,7 +64,7 @@ def turn_left():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/turn-right')
+@bp.route('/turn-right', methods=['POST'])
 def turn_right():
     try:
         send_data(States["TURNING_RIGHT"])
@@ -71,7 +72,7 @@ def turn_right():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/stop-robot')
+@bp.route('/stop-robot', methods=['POST'])
 def stop():
     try:
         send_data(States["STOP"])
@@ -79,7 +80,7 @@ def stop():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/turn-clockwise')
+@bp.route('/turn-clockwise', methods=['POST'])
 def turn_clockwise():
     try:
         send_data(States["CLOCKWISE"])
@@ -87,7 +88,7 @@ def turn_clockwise():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/turn-counter-clockwise')
+@bp.route('/turn-counter-clockwise', methods=['POST'])
 def turn_counter_clockwise():
     try:
         send_data(States["COUNTER_CLOCKWISE"])
@@ -95,10 +96,11 @@ def turn_counter_clockwise():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@bp.route('/set-speed')
+@bp.route('/set-speed', methods=['POST'])
 def set_speed():
     try:
-        speed = request.args.get('speed')
+        data = request.get_json()
+        speed = data.get('speed')
         speed = max(0, min(100, int(speed)))
         send_data(speed)
         return jsonify({'status': 'success'})
