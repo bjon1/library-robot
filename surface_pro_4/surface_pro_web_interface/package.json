@@ -6,8 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm i -ws && npm run build -ws",
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js --watch server"
+    "start": "python server_flask/index.py"
   },
   "keywords": [],
   "author": "",
