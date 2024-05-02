@@ -167,7 +167,7 @@ mag_sens = 4800.0 # magnetometer sensitivity: 4800 uT
 #measurement range is +- 4900uT
 
 # start I2C driver
-bus = smbus.SMBus(1) # start comm with i2c bus
+bus = smbus.SMBus(0) # start comm with i2c bus
 time.sleep(0.1)
 gyro_sens, accel_sens = MPU6050_start() # instantiate gyro/accel
 time.sleep(0.1)

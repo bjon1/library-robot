@@ -6,7 +6,7 @@ import numpy as np
 from threading import Thread
 import socket
 import time
-import Jetson.GPIO as GPIO
+import RPi.GPIO as GPIO
 from adafruit_pca9685 import PCA9685
 from mpu9250_i2c import *
 from SensorFusion import Orientation
@@ -25,7 +25,7 @@ class Robot:
     def __init__(self, pwm_frequency):
 
         # Initialize PCA9685 object with I2C
-        self.pca = PCA9685(busio.I2C(board.SCL_1, board.SDA_1)) #28, 27
+        self.pca = PCA9685(busio.I2C(board.SCL, board.SDA)) #5, 3
         self.pca.frequency = pwm_frequency  # Set PWM frequency to 50 Hz
         
         # Define the PWM channels for the robot's motors      
@@ -111,16 +111,19 @@ class Robot:
         yaw_to_be = current_yaw - degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2 # Error in degrees
-        while ((abs(yaw_left) > error or (current_yaw >= yaw_to_be)) and self.state == States.TURNING_LEFT):
+        while True:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = current_yaw - yaw_to_be # Calculate how much yaw is left to turn
             print("YAWLEFT", yaw_left)
             print("YAWTOBE", yaw_to_be)
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
-            #print("turn_speed", turn_speed)
+            print("turn_speed", turn_speed)
+            print("current yaw", current_yaw)
             self.counter_clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.1)
+            if((abs(yaw_left) < error) or (current_yaw <= yaw_to_be)):
+                break
         self.set_state(States.IDLE)
 
     def turn_right(self, degrees=90):
@@ -128,15 +131,17 @@ class Robot:
         yaw_to_be = current_yaw + degrees # Calculate what the yaw should be after turning
         yaw_left = degrees # Calculate how much yaw is left to turn
         error = 0.2
-        while ((abs(yaw_left) > error) or (current_yaw <= yaw_to_be) and self.state == States.TURNING_RIGHT):
-
+        while True:
             current_yaw = self.get_yaw() # Get the current yaw
             yaw_left = yaw_to_be - current_yaw # Calculate how much yaw is left to turn
             turn_speed = 65 + 35*np.sin((np.pi*(yaw_left - 22.5))/45) # Calculate the speed to turn at, assumes degrees is 90 and motors move the entire duty cycle range
             print("turn_speed", turn_speed)
+            print("current yaw", current_yaw)
             self.clockwise(turn_speed)
             print("yaw_left: ", yaw_left)
             time.sleep(0.1)
+            if((abs(yaw_left) < error) or (current_yaw >= yaw_to_be)):
+                break
         self.set_state(States.IDLE)
 
     def move_forward(self, speed):
@@ -290,15 +295,15 @@ class Robot:
         import serial
         port_bluetooth = '/dev/ttyUSB0' 
         baud_bluetooth = 9600
-
-        port_ultrasound = '/dev/ttyTHS1'
-        baud_ultrasound = 9600
-
         ser_bluetooth = serial.Serial(port_bluetooth, baud_bluetooth, timeout=0.5) 
+        
+        '''
+        port_ultrasound = '/dev/ttyS0'
+        baud_ultrasound = 9600
         ser_ultrasound = serial.Serial(port_ultrasound, baud_ultrasound, timeout=0.5)
+        '''
 
         print("Connected to: " + ser_bluetooth.portstr)
-        print("Connected to: " + ser_ultrasound.portstr)
 
         
         while True:
@@ -308,8 +313,7 @@ class Robot:
                 new_speed = self.speed
 
                 # Check for incoming bluetooth requests
-                if ser_bluetooth.in_waiting > 0:
-                    print(type(ser_bluetooth.in_waiting))
+                if ser_bluetooth.is_open and ser_bluetooth.in_waiting > 0:
                     data = ser_bluetooth.read(ser_bluetooth.in_waiting).decode('utf-8')
                     print("Found new Data (Bluetooth):", data)
 
@@ -337,27 +341,35 @@ class Robot:
                 self.set_state(new_state)
                 print("STATE, SPEED (Bluetooth)", self.state)
 
+                '''
                 # Check for incoming ultrasound data
                 if ser_ultrasound.in_waiting > 0:
-                    data = ser_ultrasound.read(ser_ultrasound.in_waiting).decode('utf-8')
+                    data = ser_ultrasound.read(ser_ultrasound.in_waiting)
                     print("Found New Data (Ultrasound): ", data)
                 # Parse incoming ultrasound data
                 #TODO: Implement the logic to handle the ultrasound data
+                '''
+                
+                sensor = USensor("sensor1", 23, 24)
+                distance = sensor.send_ultrasound()
+                print(distance)
 
                 time.sleep(0.4)
 
             except KeyboardInterrupt:
-                pass
+                break
             except Exception as e:
                 print("Error:", e)
                 continue
-            finally:
-                ser_bluetooth.close()
-                ser_ultrasound.close()
 
 
     def start_surface_pro_communicator(self):
-        host = '137.140.212.230'
+        def get_ipv4_address():
+            hostname = socket.gethostname()
+            ipv4_address = socket.gethostbyname(hostname)
+            return ipv4_address
+        
+        host = '137.140.178.21'
         port = 50000
         
         # Create a socket object
@@ -403,8 +415,7 @@ class Robot:
                 # Parse incoming data
                 new_state = self.state
                 new_speed = self.speed              
-                if data and data.isdigit():
-                    data = int(data)
+                if data:
                     if data > 0 and data < 10:
                         command_to_state = {
                             1: States.CRUISE,
@@ -419,7 +430,7 @@ class Robot:
                         }
                         new_state = command_to_state.get(data)
                     elif data >= 10 and data <= 90: 
-                        new_speed = int(data)
+                        new_speed = data
                         self.set_speed(new_speed)
 
                 self.set_state(new_state)
