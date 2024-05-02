@@ -34,9 +34,13 @@ def close_connection():
     s.close()
 
 def send_data(data):
-    data_bytes = struct.pack('B', data)
-    print("SENDING", data_bytes)
-    s.send(data_bytes)
+    try:
+        print("SENDING DATA", data)
+        data = bytes([data])
+        s.send(data)
+        print("SENT")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 bp = Blueprint('robot', __name__)
 
@@ -107,4 +111,4 @@ def set_speed():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-connect_to_server('137.140.212.230', 50000)
+connect_to_server('137.140.178.21', 50000)
