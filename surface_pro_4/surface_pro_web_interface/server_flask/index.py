@@ -1,15 +1,15 @@
-from flask import Flask, send_from_directory, request, jsonify
-from flask_cors import CORS
+from threading import Thread
 import os
+from flask import Flask, send_from_directory, Response, jsonify
+from flask_cors import CORS
+from models.AI import ObjectDetection
 
 app = Flask(__name__, static_folder='../client/dist')
 CORS(app, resources={r"/api/*": {"origins": "*"}}, methods='GET,POST,PUT,DELETE,PATCH', supports_credentials=True)
 
 # Add Controllers
 from models import robot
-from models import AICommunicator
 app.register_blueprint(robot.bp, url_prefix='/api/robot')
-app.register_blueprint(AICommunicator.bp, url_prefix='/api/ai') 
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -29,5 +29,15 @@ def internal_server_error(e):
     }
     return jsonify(response), 500
 
-if __name__ == "__main__":
-    app.run(port=5000)
+def generate():
+    detector = ObjectDetection(capture_index=0)
+    while True:
+        frame_data = detector()
+        yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + frame_data['frame'] + b'\r\n')
+
+@app.route('/stream')
+def stream():
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    app.run(host='localhost', port=5000)

@@ -1,5 +1,3 @@
-import base64
-import json
 import torch
 import cv2
 from ultralytics import YOLO
@@ -46,9 +44,10 @@ class ObjectDetection:
         results = self.predict(frame)
         frame, class_ids, class_names = self.plot_bboxes(results, frame)
         _, jpeg = cv2.imencode('.jpg', frame)
-        frame = base64.b64encode(jpeg.tobytes()).decode('utf-8')# Convert bytes to base64 encoded string
+        jpeg_bytes = jpeg.tobytes()
         frame_data = {
-            'frame' : frame,
+            'frame' : jpeg_bytes,
             'class_names':  class_names,
+            'class_ids':    class_ids
         }
-        return json.dumps(frame_data) + '\n'
+        return frame_data
